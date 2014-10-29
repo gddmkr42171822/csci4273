@@ -1,0 +1,44 @@
+
+CSCI 4273 (NETWORK SYSTEMS)
+PROGRAMMING ASSIGNMENT 1 
+
+----Executables----
+
+./chat_client - A simple program to communicate between other clients with tcp and between a coordinator with udp
+./chat_coordinator - A simple program to keep track of different chat sessions
+./chat_server - A simple program that creates a tcp chat session and keeps track of clients in that session
+
+
+----How To Run Examples----
+
+Compile Files:
+	Make
+
+Clear Compilation:
+	Make clean
+
+
+chat_client:
+	./chat_client <hostname> <port>
+
+chat_coordinator:
+	./chat_coordinator
+
+****Note****
+In order to run this program, you must have one instance of the chat_client running and one instance of the chat_coordinator running.  All chat commands are run from the chat_client.
+
+
+----Unimplemented Specifications----
+
+1. GetNext and GetAll do not return message length to client. [RECTIFIED]
+
+2. GetAll does not return number of messages it is sending back to the client. [RECTIFIED]
+
+
+----Known Bugs----
+
+1. Submitted Messages That Are Duplicates Of Messages In The Chat History Cause A Loop When Using the GetNext and GetAll Commands [RECTIFIED]
+
+2. If There Are Unread Messages In The Chat History By A Client And That Client Submits A Message, Then When That Client Tries To GetNext Or GetAll Any Unread Messages, Those Messages Will Not Be Returned.
+
+3. When a tcp server socket is closed the tcp server is still listening. [RECTIFIED]

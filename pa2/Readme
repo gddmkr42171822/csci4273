@@ -1,0 +1,56 @@
+Name: Robert Werthman
+
+CSCI 4273 (Network Systems)
+Programming Assignment 2
+
+
+---- Directory Structure (after 'make all') ----
+
+pa2/
+|-- Makefile
+|-- Readme
+|-- client/
+|	|-- echoClient.c
+|	|-- cacert.pem
+|	|-- cakey.pem
+|	|-- ./echoClient
+|-- server/
+	|-- echoServer.c
+	|-- server.crt
+	|-- server_priv.key
+	|--./echoServer
+
+----Executables----
+
+./echoClient - Simplest program that chats with a server using SSL and TCP
+./echoServer - Simplest program that echos what is sent to it using SSL and TCP
+
+----How To Run Program----
+
+To Compile Files (be in the directory where the makefile is):
+	make all
+
+To Clear Compilation
+	make clean
+
+echoClient:
+	./echoClient <port> <hostname>
+
+echoServer:
+	./echoServer <port>
+
+**** NOTE ****
+In order to run this program, you must have one instance of the
+echoServer running before starting an instance of the echoClient.
+All text is via the stdin of the echoClient terminal.
+
+----Testing----
+The server was tested with 'openssl s_client' which allowed me 
+to view the server certificate, symmetric key, and crypto used
+to transmit data.
+
+----Unimplemented Specifications----
+NONE
+
+----Known Bugs----
+NONE
