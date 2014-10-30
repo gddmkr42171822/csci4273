@@ -91,7 +91,7 @@ int EventScheduler::eventSchedule(void evFunction(void *),void *arg, int timeout
 		new_event->timeout = timeout;
 		new_event->event_id = new_eventId;
 		event_queue.insert(event_queue.begin(), new_event);
-		sort(event_queue.begin(), event_queue.end(), vector_comparator);
+		//sort(event_queue.begin(), event_queue.end(), vector_comparator);
 		return new_event->event_id;
 	}
 	else {
@@ -130,27 +130,19 @@ void *EventScheduler::event_work(void)
 			}
 			else {
 				threads_available--;
+				sort(event_queue.begin(), event_queue.end(), vector_comparator);
 				execute_event = *(event_queue.end()-1);
 				event_queue.pop_back();
 				event_timeout.tv_usec = execute_event->timeout;
 				cout << "Select will wait |" << event_timeout.tv_usec <<"| microseconds" \
 				" on Event id |" << execute_event->event_id << "|" << endl;
 				select_error = select(0, NULL, NULL, NULL, &event_timeout);
-				if(select_error == 0) {
-					dispatch = execute_event->evFunction;
-					dispatch(execute_event->arg);
-					mutex_unlock_error = pthread_mutex_unlock(&queue_mutex);
-					if(mutex_unlock_error) {
-						fprintf(stderr, "error unlocking queue!\n");
-					}
-					delete execute_event;
-				}
-				else {
-					cerr << "select did not work for the event!" << endl;
-					mutex_unlock_error = pthread_mutex_unlock(&queue_mutex);
-					if(mutex_unlock_error) {
-						fprintf(stderr, "error unlocking queue!\n");
-					}
+				dispatch = execute_event->evFunction;
+				dispatch(execute_event->arg);
+				delete execute_event;
+				mutex_unlock_error = pthread_mutex_unlock(&queue_mutex);
+				if(mutex_unlock_error) {
+					fprintf(stderr, "error unlocking queue!\n");
 				}
 				threads_available++;
 			}
