@@ -25,110 +25,77 @@ class EventScheduler
 			}
 		} vector_comparator;
 		vector<event*> event_queue;
+		vector<pthread_t> event_threads;
 		int new_eventId;
-		int vector_size;
-		int max_events;
-		ThreadPool *event_pool_pointer;
+		unsigned int max_events;
+		pthread_mutex_t queue_mutex;
+		bool program_is_over;
+		unsigned int threads_available;
 };
-
-void EventScheduler::test(void) 
-{
-	new_eventId = 0;
-	vector_size = 4;
-	max_events = 3;
-	//(void) maxEvents;
-	cout << "Testing vector queue" << endl;
-
-	event* event1 = new event;
-	event1->timeout = 5;
-	event1->event_id = new_eventId;
-
-	event* event2 = new event;
-	event2->timeout = 6;
-	new_eventId++;
-	event2->event_id = new_eventId;
-
-	event* event3 = new event;
-	event3->timeout = 4;
-	new_eventId++;
-	event3->event_id = new_eventId;
-
-	event* event4 = new event;
-	event4->timeout = 4;
-	new_eventId++;
-	event4->event_id = new_eventId;
-
-	if(vector_size <= max_events) {
-		cout << "queue is not full" << endl;
-	}
-	else {
-		cout << "queue is full" << endl; 
-	}
-	event_queue.push_back(event4);
-	event_queue.push_back(event1);
-	event_queue.push_back(event3);
-	event_queue.push_back(event2);
-	int eventId = 5;
-	sort(event_queue.begin(), event_queue.end(), vector_comparator);
-	for(vector<event*>::iterator it = event_queue.begin(); it != event_queue.end(); it++) {
-		cout << "EventId |" << (*it)->event_id << "|; timeout |" << (*it)->timeout << "|" << endl;
-	}
-	bool event_is_in_queue = false;
-	for(vector<event*>::iterator it = event_queue.begin(); it != event_queue.end(); it++) {
-		if((*it)->event_id == eventId) {
-			cout << "Erasing event id " << (*it)->event_id << endl; 
-			event_queue.erase(it);
-			event_is_in_queue = true;
-			break;
-		}
-	}
-	if(event_is_in_queue == false) {
-		cerr << "Event id was not found in queue!" << endl;
-	}
-	for(vector<event*>::iterator it = event_queue.begin(); it != event_queue.end(); it++) {
-		cout << "EventId |" << (*it)->event_id << "|; timeout |" << (*it)->timeout << "|" << endl;
-	}
-	cout << "Popping event id |" << (*(event_queue.end()-1))->event_id << "| with lowest time |"\
-	<< (*(event_queue.end()-1))->timeout << "| off queue" << endl;
-	event_queue.pop_back();
-	cout << "Size of queue is " << event_queue.size() << endl;
-	cout << "End test" << endl;
-};
-
 
 EventScheduler::EventScheduler(size_t maxEvents) 
 {
-	pthread_t event_thread;
+	int queue_mutex_error, pthread_create_error;
+	threads_available = 0;
+	program_is_over = false;
+	event_threads.resize(maxEvents);
 	new_eventId = 0;
-	vector_size = 0;
+	queue_mutex_error = pthread_mutex_init(&queue_mutex, NULL);
+	if(queue_mutex_error) {
+		fprintf(stderr, "Error creating queue mutex\n");
+		exit(EXIT_FAILURE);
+	}
+	for(unsigned int i = 0; i < maxEvents; i++) {
+		pthread_create_error = pthread_create(&event_threads[i], NULL, work_helper, this);
+		if(pthread_create_error) {
+			fprintf(stderr, "Error creating thread |%d|\n", i);
+			exit(EXIT_FAILURE);
+		}
+		else {
+			printf("Creating thread |%d|\n", i);
+		}
+	}
 	max_events = maxEvents;
-	ThreadPool event_pool(max_events);
-	event_pool_pointer = &event_pool;
-	pthread_create(&event_thread, NULL, work_helper, this);
-}
+};
 
 EventScheduler::~EventScheduler(void) 
 {
-	cout << "Destroying eventScheduler object" << endl;	
+	int pthread_join_error, queue_mutex_error;
+	while(!event_queue.empty() && (threads_available < max_events)) {
+	}
+	program_is_over = true;
+	for(unsigned int i = 0; i < event_threads.size(); i++) {
+		pthread_join_error = pthread_join(event_threads[i], NULL);
+		if(pthread_join_error) {
+			fprintf(stderr, "Error joining thread |%d|\n", i);
+		}
+		else {
+			printf("Thread |%d| destroyed!\n", i);
+		}
+	}
+	event_threads.clear();
+	queue_mutex_error = pthread_mutex_destroy(&queue_mutex);
+	if(queue_mutex_error) {
+		fprintf(stderr, "Error destroying queue mutex\n");
+	}
 };
 
 int EventScheduler::eventSchedule(void evFunction(void *),void *arg, int timeout) 
 {
-	vector_size++;
-	if(vector_size <= max_events) {
+	if(event_queue.size() < max_events) {
 		new_eventId++;
+		printf("putting event %d in queue\n", new_eventId);
 		event *new_event = new event;	
 		new_event->evFunction = evFunction;
 		new_event->arg = arg;
 		new_event->timeout = timeout;
 		new_event->event_id = new_eventId;
-		event_queue.push_back(new_event);
+		event_queue.insert(event_queue.begin(), new_event);
 		sort(event_queue.begin(), event_queue.end(), vector_comparator);
 		return new_event->event_id;
 	}
 	else {
-		cerr << "Queue is full.  Cannot schedule anymore events!" << endl;
-		vector_size--;
+		fprintf(stderr, "Queue is full!  Cannot schedule event |%d|!\n", new_eventId + 1);
 		return -1;
 	}
 };
@@ -140,7 +107,6 @@ void EventScheduler::eventCancel(int eventId)
 		if((*it)->event_id == eventId) {
 			cout << "Erasing event id " << (*it)->event_id << endl; 
 			event_queue.erase(it);
-			vector_size--;
 			event_is_in_queue = true;
 			break;
 		}
@@ -152,36 +118,47 @@ void EventScheduler::eventCancel(int eventId)
 
 void *EventScheduler::event_work(void) 
 {
-	int select_error;
+	int select_error, mutex_trylock_error, mutex_unlock_error;
 	void (*dispatch)(void*);
 	struct event *execute_event;	
 	struct timeval event_timeout = { 0, 0}; 
+	threads_available++;
 	while(1) {
 		if(!event_queue.empty()) {
-			execute_event = *(event_queue.end()-1);
-			event_timeout.tv_usec = execute_event->timeout;//(*(event_queue.end()-1)->timeout);
-			cout << "Select will wait |" << event_timeout.tv_usec <<"| microseconds" << endl;
-			cout << "Event id is |" << execute_event->event_id << "|" << endl;
-			select_error = select(0, NULL, NULL, NULL, &event_timeout);
-			if(select_error == 0) {
-				cout << "Event will now be executed!" << endl;
+			mutex_trylock_error = pthread_mutex_trylock(&queue_mutex);
+			if(mutex_trylock_error) {
 			}
 			else {
-				cerr << "select did not work for the event!" << endl;
-			}
-			if(event_pool_pointer->thread_avail()) {
+				threads_available--;
+				execute_event = *(event_queue.end()-1);
 				event_queue.pop_back();
-				dispatch = execute_event->evFunction;
-				event_pool_pointer->dispatch_thread(*dispatch, execute_event->arg);
-				delete execute_event;
+				event_timeout.tv_usec = execute_event->timeout;
+				cout << "Select will wait |" << event_timeout.tv_usec <<"| microseconds" \
+				" on Event id |" << execute_event->event_id << "|" << endl;
+				select_error = select(0, NULL, NULL, NULL, &event_timeout);
+				if(select_error == 0) {
+					dispatch = execute_event->evFunction;
+					dispatch(execute_event->arg);
+					mutex_unlock_error = pthread_mutex_unlock(&queue_mutex);
+					if(mutex_unlock_error) {
+						fprintf(stderr, "error unlocking queue!\n");
+					}
+					delete execute_event;
+				}
+				else {
+					cerr << "select did not work for the event!" << endl;
+					mutex_unlock_error = pthread_mutex_unlock(&queue_mutex);
+					if(mutex_unlock_error) {
+						fprintf(stderr, "error unlocking queue!\n");
+					}
+				}
+				threads_available++;
 			}
-			else {
-				cerr << "Could not schedule event!" << endl;
-			}
+		}
+		if(program_is_over && event_queue.empty()) {
+			pthread_exit(NULL);
 		}
 	}
 	return NULL;
 };
-
-
 #endif
