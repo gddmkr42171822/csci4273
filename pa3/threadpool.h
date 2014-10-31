@@ -52,14 +52,10 @@ ThreadPool::~ThreadPool(void)
 	int pthread_join_error, queue_mutex_error;
 	unsigned int i;
 	long int num_vector_threads = active_threads.size();
-	printf("Program ending!\n");
 	while(!workQueue.empty() && (threads_available < active_threads.size())) {
 		/* Wait until all the threads have completed their work */
 	}
-	printf("Threads available |%d|\n", threads_available);
-	printf("Number of threads in vector |%ld|\n", active_threads.size());
 	program_is_over = true;
-	printf("Destrying mutexes and threads\n");
 	for(i = 0; i < num_vector_threads; i++) {
 		pthread_join_error = pthread_join(active_threads[i], NULL);
 		if(pthread_join_error) {
@@ -70,7 +66,6 @@ ThreadPool::~ThreadPool(void)
 		}
 	}
 	active_threads.clear();
-	printf("Threads left in vector |%ld|\n", active_threads.size());
 	queue_mutex_error = pthread_mutex_destroy(&queue_mutex);
 	if(queue_mutex_error) {
 		fprintf(stderr, "Error destroying queue mutex\n");
@@ -104,27 +99,26 @@ void *ThreadPool::thread_work(void)
 		if(!workQueue.empty()) {
 			mutex_trylock_error = pthread_mutex_trylock(&queue_mutex);
 			if(mutex_trylock_error) { // A thread has already locked the queue
-			//	fprintf(stderr, "Queue could not be locked\n");
 			}
 			else { // This thread has acquired the lock on the queue
-				printf("Lock Queue\n");
 				threads_available--;
 				void (*dispatch)(void*);
 				dispatch_struct *work;
-				work = workQueue.front();
-				workQueue.pop();
-				dispatch = work->dispatch_function;
-				dispatch(work->arg);
-				delete work;
+				if(workQueue.size() != 0) {
+					work = workQueue.front();
+					workQueue.pop();
+					dispatch = work->dispatch_function;
+					dispatch(work->arg);
+					delete work;
+				}
 				mutex_unlock_error = pthread_mutex_unlock(&queue_mutex);
 				if(mutex_unlock_error) {
 					fprintf(stderr, "Error unlocking queue!\n");
 				}
-				printf("Unlock Queue\n");
 				threads_available++;
 			}
 		}
-		if(program_is_over) {
+		if(program_is_over && workQueue.empty()) {
 			break;
 		}
 	}

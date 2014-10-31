@@ -38,7 +38,7 @@ int main ( )
 			}
 	
 		}
-		sleep(6);        
+		sleep(1);        
     	} 
 }
 
