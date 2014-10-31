@@ -23,53 +23,32 @@ class ThreadPool
 		pthread_mutex_t queue_mutex;
 		unsigned int threads_available;
 		bool program_is_over;
+		unsigned int max_threads;
 };
 
 ThreadPool::ThreadPool(size_t threadCount) 
 {
 	active_threads.resize(threadCount);
-	int pthread_create_error, queue_mutex_error;
-	unsigned int i;
+	max_threads = threadCount;
 	threads_available = 0;
 	program_is_over = false;
-	queue_mutex_error = pthread_mutex_init(&queue_mutex, NULL);
-	if(queue_mutex_error) {
-		fprintf(stderr, "Error creating queue mutex\n");
-		exit(EXIT_FAILURE);
-	}
-	for(i = 0; i < threadCount; i++) {
-		printf("Creating thread |%d|!\n", i);
-		pthread_create_error = pthread_create(&active_threads[i], NULL, work_helper, this);
-		if(pthread_create_error) {
-			fprintf(stderr, "Error creating thread |%d|\n", i);
-			exit(EXIT_FAILURE);
-		}
+	pthread_mutex_init(&queue_mutex, NULL);
+	for(unsigned int i = 0; i < threadCount; i++) {
+		pthread_create(&active_threads[i], NULL, work_helper, this);
 	}
 }
 
 ThreadPool::~ThreadPool(void) 
 {
-	int pthread_join_error, queue_mutex_error;
-	unsigned int i;
-	long int num_vector_threads = active_threads.size();
 	while(!workQueue.empty() && (threads_available < active_threads.size())) {
 		/* Wait until all the threads have completed their work */
 	}
 	program_is_over = true;
-	for(i = 0; i < num_vector_threads; i++) {
-		pthread_join_error = pthread_join(active_threads[i], NULL);
-		if(pthread_join_error) {
-			fprintf(stderr, "Error joining thread |%d|\n", i);
-		}
-		else {
-			printf("Thread |%d| destroyed!\n", i);
-		}
+	for(unsigned int i = 0; i < max_threads; i++) {
+		pthread_join(active_threads[i], NULL);
 	}
 	active_threads.clear();
-	queue_mutex_error = pthread_mutex_destroy(&queue_mutex);
-	if(queue_mutex_error) {
-		fprintf(stderr, "Error destroying queue mutex\n");
-	}
+	pthread_mutex_destroy(&queue_mutex);
 }
 
 int ThreadPool::dispatch_thread(void dispatch_function(void*), void *arg) 
@@ -83,7 +62,7 @@ int ThreadPool::dispatch_thread(void dispatch_function(void*), void *arg)
 
 bool ThreadPool::thread_avail(void) 
 {
-	if((threads_available > 0) && (threads_available > workQueue.size())) {
+	if(threads_available > workQueue.size() && workQueue.size() < max_threads) {
 		return true;
 	}
 	else {
@@ -93,33 +72,26 @@ bool ThreadPool::thread_avail(void)
 
 void *ThreadPool::thread_work(void) 
 {
-	int mutex_trylock_error, mutex_unlock_error;
 	threads_available++;
 	while(1) {
-		if(!workQueue.empty()) {
-			mutex_trylock_error = pthread_mutex_trylock(&queue_mutex);
-			if(mutex_trylock_error) { // A thread has already locked the queue
+		if(pthread_mutex_trylock(&queue_mutex)) { 
+		}
+		else { 
+			threads_available--;
+			void (*dispatch)(void*);
+			dispatch_struct *work;
+			if(workQueue.size() > 0) {
+				work = workQueue.front();
+				workQueue.pop();
+				dispatch = work->dispatch_function;
+				dispatch(work->arg);
+				delete work;
 			}
-			else { // This thread has acquired the lock on the queue
-				threads_available--;
-				void (*dispatch)(void*);
-				dispatch_struct *work;
-				if(workQueue.size() != 0) {
-					work = workQueue.front();
-					workQueue.pop();
-					dispatch = work->dispatch_function;
-					dispatch(work->arg);
-					delete work;
-				}
-				mutex_unlock_error = pthread_mutex_unlock(&queue_mutex);
-				if(mutex_unlock_error) {
-					fprintf(stderr, "Error unlocking queue!\n");
-				}
-				threads_available++;
-			}
+			pthread_mutex_unlock(&queue_mutex);
+			threads_available++;
 		}
 		if(program_is_over && workQueue.empty()) {
-			break;
+			pthread_exit(NULL);	
 		}
 	}
 	return NULL;
