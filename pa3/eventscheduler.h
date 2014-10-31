@@ -110,8 +110,7 @@ void *EventScheduler::event_work(void)
 			}
 			pthread_mutex_unlock(&queue_mutex);
 			threads_available++;
-			}
-		
+		}
 		if(program_is_over && event_queue.empty()) {
 			pthread_exit(NULL);
 		}
