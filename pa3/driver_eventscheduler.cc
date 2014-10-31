@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <vector>
 #include <stdio.h>
+#include <semaphore.h>
 
 using namespace std;
 

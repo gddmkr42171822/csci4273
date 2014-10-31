@@ -84,18 +84,16 @@ int EventScheduler::eventSchedule(void evFunction(void *),void *arg, int timeout
 {
 	if(event_queue.size() < max_events) {
 		new_eventId++;
-		printf("putting event %d in queue\n", new_eventId);
 		event *new_event = new event;	
 		new_event->evFunction = evFunction;
 		new_event->arg = arg;
 		new_event->timeout = timeout;
 		new_event->event_id = new_eventId;
 		event_queue.insert(event_queue.begin(), new_event);
-		//sort(event_queue.begin(), event_queue.end(), vector_comparator);
 		return new_event->event_id;
 	}
 	else {
-		fprintf(stderr, "Queue is full!  Cannot schedule event |%d|!\n", new_eventId + 1);
+		cerr << "Queue is full!" << endl;
 		return -1;
 	}
 };
@@ -132,18 +130,15 @@ void *EventScheduler::event_work(void)
 				threads_available--;
 				sort(event_queue.begin(), event_queue.end(), vector_comparator);
 				execute_event = *(event_queue.end()-1);
-				event_queue.pop_back();
-				event_timeout.tv_usec = execute_event->timeout;
-				cout << "Select will wait |" << event_timeout.tv_usec <<"| microseconds" \
-				" on Event id |" << execute_event->event_id << "|" << endl;
-				select_error = select(0, NULL, NULL, NULL, &event_timeout);
-				dispatch = execute_event->evFunction;
-				dispatch(execute_event->arg);
-				delete execute_event;
-				mutex_unlock_error = pthread_mutex_unlock(&queue_mutex);
-				if(mutex_unlock_error) {
-					fprintf(stderr, "error unlocking queue!\n");
+				if(event_queue.size() != 0) {
+					event_timeout.tv_usec = execute_event->timeout;
+					select(0, NULL, NULL, NULL, &event_timeout);
+					event_queue.pop_back();
+					dispatch = execute_event->evFunction;
+					dispatch(execute_event->arg);
+					delete execute_event;
 				}
+				pthread_mutex_unlock(&queue_mutex);
 				threads_available++;
 			}
 		}
