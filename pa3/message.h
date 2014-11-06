@@ -102,17 +102,25 @@ private:
 
     size_t Message::msgLen( )
     {
-	size_t msglen = 0;
+	size_t messagelen = 0;
 	for(list<character_buffer*>::iterator it=message_container.begin(); it !=message_container.end(); it++) {
-		msglen += (*it)->message_len;
+		messagelen += (*it)->message_len;
 	}
-	return msglen;
+	return messagelen;
     }
 
     void Message::msgFlat(char *buffer)
     {
-	//Assume that sufficient memory has been allocated in buffer
-
-	memcpy(buffer, msg_content, msglen);
+	for(list<character_buffer*>::iterator it=message_container.begin(); it !=message_container.end(); it++) {
+		if(it == message_container.begin()) {
+			strcpy(buffer, (*it)->message_buffer);
+			cout << (*it)->message_buffer << endl;
+		}
+		else {
+			strcat(buffer, (*it)->message_buffer);
+			cout << (*it)->message_buffer << endl;
+		}
+	}
+	cout << strlen(buffer) << endl;
     }
 

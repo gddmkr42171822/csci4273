@@ -12,29 +12,35 @@ using namespace std;
 
 int main ( )
 {
-    char *b1 = new char[100];
+
+    char *b1 = new char[101];
     for (int i = 0; i < 100; i++) b1[i] = 'a';
+    b1[101] = '\0';
 
-    char *h1 = new char[5];
+    char *h1 = new char[6];
     for (int i = 0; i < 5; i++) h1[i] = 'h';
+    h1[6] = '\0';
 
-    char *h2 = new char[4];
+    char *h2 = new char[5];
     for (int i = 0; i < 4; i++) h2[i] = 'k';
+    h2[5] = '\0';
 
-    char *h3 = new char[24];
+    char *h3 = new char[25];
     for (int i = 0; i < 24; i++) h3[i] = 'm';
-
+    h3[25] = '\0';
+    
     Message *m = new Message(b1, 100);
     m->msgAddHdr(h1, 5);
     m->msgAddHdr(h2, 4);
     m->msgAddHdr(h3, 24);
     cout << "Message length = " << m->msgLen( ) << endl;
-/*    
+    
     char* buf = new char[140];
     m->msgFlat(buf);
     buf[m->msgLen ( )] = '\n';
     cout << "Message: " << buf << endl;
-
+    
+/*
     Message m2;
 
     m->msgSplit(m2, 50);
