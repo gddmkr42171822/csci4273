@@ -8,7 +8,6 @@
 class Message
 {
 public:
-   
     Message( );
     Message(char* msg, size_t len);
     ~Message( );
@@ -18,40 +17,38 @@ public:
     void msgJoin(Message& secondMsg);
     size_t msgLen( );
     void msgFlat(char *buffer);
-
 private:
+    struct character_buffer {
+	    char *message_buffer;
+	    size_t message_len;
+    };
+    list<character_buffer*> message_container;
     size_t msglen;
     char *msg_content;
 };
 
     Message::Message()
     {
-	msglen = 0;
-	msg_content = NULL;
     }
 
     Message::Message(char* msg, size_t len)
     {
-	msglen = len;
-	msg_content = new char[len];
-	memcpy(msg_content, msg, len);
+	character_buffer *new_message = new character_buffer;
+	new_message->message_buffer = msg;
+	new_message->message_len = len;
+	message_container.push_front(new_message);
     }
 
     Message::~Message( )
     {
-            delete msg_content;
     }
 
     void Message::msgAddHdr(char *hdr, size_t length)
     {
-	char *new_msg_content;
-
-	new_msg_content = new char[msglen + length];
-        memcpy(new_msg_content, hdr, length);
-	memcpy(new_msg_content + length, msg_content, msglen);
-	delete msg_content;
-	msg_content = new_msg_content;
-	msglen += length;
+	character_buffer *new_message = new character_buffer;
+	new_message->message_buffer = hdr;
+	new_message->message_len = length;
+	message_container.push_front(new_message);
     }
 
     char* Message::msgStripHdr(int len)
@@ -105,6 +102,10 @@ private:
 
     size_t Message::msgLen( )
     {
+	size_t msglen = 0;
+	for(list<character_buffer*>::iterator it=message_container.begin(); it !=message_container.end(); it++) {
+		msglen += (*it)->message_len;
+	}
 	return msglen;
     }
 

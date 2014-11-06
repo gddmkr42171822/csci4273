@@ -42,6 +42,7 @@ int main ( )
     es.eventCancel(i3);
     i5 = es.eventSchedule(test_fn2, (void *)&a2, m2);
     i6 = es.eventSchedule(test_fn3, (void *)&a6, m6);
+    cout << i1 << " " << i2 << " " << i3 << " " << i4 << " " << i5 << " " << i6 << endl;
 }
 
 

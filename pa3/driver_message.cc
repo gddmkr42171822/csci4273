@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <string.h>
+#include <list>
 
 using namespace std;
 
@@ -28,7 +29,7 @@ int main ( )
     m->msgAddHdr(h2, 4);
     m->msgAddHdr(h3, 24);
     cout << "Message length = " << m->msgLen( ) << endl;
-    
+/*    
     char* buf = new char[140];
     m->msgFlat(buf);
     buf[m->msgLen ( )] = '\n';
@@ -89,7 +90,7 @@ int main ( )
     m->msgFlat(bufa);
     bufa[m->msgLen ( )] = '\n';
     cout << "Message: " << bufa << endl;
-
+*/
 }
 
 
