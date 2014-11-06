@@ -12,7 +12,7 @@ using namespace std;
 
 int main ( )
 {
-
+/*
     char *b1 = new char[101];
     for (int i = 0; i < 100; i++) b1[i] = 'a';
     b1[101] = '\0';
@@ -28,7 +28,19 @@ int main ( )
     char *h3 = new char[25];
     for (int i = 0; i < 24; i++) h3[i] = 'm';
     h3[25] = '\0';
-    
+*/    
+    char *b1 = new char[100];
+    for (int i = 0; i < 100; i++) b1[i] = 'a';
+
+    char *h1 = new char[5];
+    for (int i = 0; i < 5; i++) h1[i] = 'h';
+
+    char *h2 = new char[4];
+    for (int i = 0; i < 4; i++) h2[i] = 'k';
+
+    char *h3 = new char[24];
+    for (int i = 0; i < 24; i++) h3[i] = 'm';
+
     Message *m = new Message(b1, 100);
     m->msgAddHdr(h1, 5);
     m->msgAddHdr(h2, 4);
