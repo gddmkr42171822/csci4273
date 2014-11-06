@@ -114,13 +114,10 @@ private:
 	for(list<character_buffer*>::iterator it=message_container.begin(); it !=message_container.end(); it++) {
 		if(it == message_container.begin()) {
 			strcpy(buffer, (*it)->message_buffer);
-			cout << (*it)->message_buffer << endl;
 		}
 		else {
 			strcat(buffer, (*it)->message_buffer);
-			cout << (*it)->message_buffer << endl;
 		}
 	}
-	cout << strlen(buffer) << endl;
     }
 
