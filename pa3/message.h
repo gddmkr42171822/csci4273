@@ -113,10 +113,10 @@ private:
     {
 	for(list<character_buffer*>::iterator it=message_container.begin(); it !=message_container.end(); it++) {
 		if(it == message_container.begin()) {
-			strcpy(buffer, (*it)->message_buffer);
+			strncpy(buffer, (*it)->message_buffer, (*it)->message_len);
 		}
 		else {
-			strcat(buffer, (*it)->message_buffer);
+			strncat(buffer, (*it)->message_buffer, (*it)->message_len);
 		}
 	}
     }
