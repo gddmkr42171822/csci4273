@@ -35,7 +35,7 @@ private:
     {
 	msglen = len;
 	for(unsigned int i = 0; i < len; i++) {
-		message_container.push_back(msg[i]);
+		message_container.push_front(msg[i]);
 	}
     }
 
