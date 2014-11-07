@@ -70,18 +70,11 @@ private:
 
     int Message::msgSplit(Message& secondMsg, size_t len)
     {
-	char *content = msg_content;
-	size_t length = msglen;
-
 	if ((len < 0) || (len > msglen)) return 0;
-
-	msg_content = new char[len];
-	msglen = len;
-	memcpy(msg_content, content, len);
-	secondMsg.msglen = length - len;
-	secondMsg.msg_content = new char[secondMsg.msglen];
-	memcpy(secondMsg.msg_content, content + len, secondMsg.msglen);
-	delete content;
+	list<char>::iterator it = message_container.begin();
+	advance(it, len);
+	secondMsg.message_container.splice(secondMsg.message_container.begin(), message_container, \
+	it, message_container.end());
 	return 1;
     }
 

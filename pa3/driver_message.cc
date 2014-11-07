@@ -5,6 +5,7 @@
 #include <sys/time.h>
 #include <string.h>
 #include <list>
+#include <iterator>
 
 using namespace std;
 
@@ -52,7 +53,6 @@ int main ( )
     buf[m->msgLen ( )] = '\n';
     cout << "Message: " << buf << endl;
     
-/*
     Message m2;
 
     m->msgSplit(m2, 50);
@@ -69,7 +69,7 @@ int main ( )
     bufy[m2.msgLen ( )] = '\n';
     cout << "Message: " << bufy << endl;
 
-
+/*
 
     Message *m1 = new Message(buf, 133);
     char *c1 = m1->msgStripHdr(24);
