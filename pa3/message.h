@@ -22,7 +22,7 @@ private:
 	    char *message_buffer;
 	    size_t message_len;
     };
-    list<character_buffer*> message_container;
+    list<char> message_container;
     size_t msglen;
     char *msg_content;
 };
@@ -33,10 +33,9 @@ private:
 
     Message::Message(char* msg, size_t len)
     {
-	character_buffer *new_message = new character_buffer;
-	new_message->message_buffer = msg;
-	new_message->message_len = len;
-	message_container.push_front(new_message);
+	for(unsigned int i = 0; i < len; i++) {
+		message_container.push_back(msg[i]);
+	}
     }
 
     Message::~Message( )
@@ -45,10 +44,9 @@ private:
 
     void Message::msgAddHdr(char *hdr, size_t length)
     {
-	character_buffer *new_message = new character_buffer;
-	new_message->message_buffer = hdr;
-	new_message->message_len = length;
-	message_container.push_front(new_message);
+	for(unsigned int i = 0; i < length; i++) {
+		message_container.push_front(hdr[i]);
+	}
     }
 
     char* Message::msgStripHdr(int len)
@@ -102,22 +100,15 @@ private:
 
     size_t Message::msgLen( )
     {
-	size_t messagelen = 0;
-	for(list<character_buffer*>::iterator it=message_container.begin(); it !=message_container.end(); it++) {
-		messagelen += (*it)->message_len;
-	}
-	return messagelen;
+	return message_container.size();
     }
 
     void Message::msgFlat(char *buffer)
     {
-	for(list<character_buffer*>::iterator it=message_container.begin(); it !=message_container.end(); it++) {
-		if(it == message_container.begin()) {
-			strncpy(buffer, (*it)->message_buffer, (*it)->message_len);
-		}
-		else {
-			strncat(buffer, (*it)->message_buffer, (*it)->message_len);
-		}
+	int i = 0;
+	for(list<char>::iterator it = message_container.begin(); it != message_container.end(); it++) {
+		buffer[i] = *it;
+		i++;
 	}
     }
 
