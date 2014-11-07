@@ -33,6 +33,7 @@ private:
 
     Message::Message(char* msg, size_t len)
     {
+	msglen = len;
 	for(unsigned int i = 0; i < len; i++) {
 		message_container.push_back(msg[i]);
 	}
@@ -44,6 +45,7 @@ private:
 
     void Message::msgAddHdr(char *hdr, size_t length)
     {
+	msglen += length;
 	for(unsigned int i = 0; i < length; i++) {
 		message_container.push_front(hdr[i]);
 	}
