@@ -18,10 +18,6 @@ public:
     size_t msgLen( );
     void msgFlat(char *buffer);
 private:
-    struct character_buffer {
-	    char *message_buffer;
-	    size_t message_len;
-    };
     list<char> message_container;
     size_t msglen;
     char *msg_content;
@@ -35,7 +31,7 @@ private:
     {
 	msglen = len;
 	for(unsigned int i = 0; i < len; i++) {
-		message_container.push_front(msg[i]);
+		message_container.push_back(msg[i]);
 	}
     }
 
@@ -53,18 +49,19 @@ private:
 
     char* Message::msgStripHdr(int len)
     {
-	char *new_msg_content;
-	char *stripped_content;
-	
         if ((msglen < len) || (len == 0)) return NULL;
-
-	new_msg_content = new char[msglen - len];
-	stripped_content = new char[len];
-	memcpy(stripped_content, msg_content, len);
-	memcpy(new_msg_content, msg_content + len, msglen - len);
+	char *stripped_content = new char[len];
+	list<char> stripped_header_list;
+	list<char>::iterator last_char_of_header = message_container.begin();
+	advance(last_char_of_header, len);
+	stripped_header_list.splice(stripped_header_list.begin(), message_container, message_container.begin(), \
+	last_char_of_header);
+	int i = 0;
+	for(list<char>::iterator it = stripped_header_list.begin(); it != stripped_header_list.end(); it++) {
+		stripped_content[i] = *it;
+		i++;
+	}
 	msglen -= len;
-	delete msg_content;
-	msg_content = new_msg_content;
 	return stripped_content;
     }
 

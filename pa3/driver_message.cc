@@ -69,7 +69,7 @@ int main ( )
     bufy[m2.msgLen ( )] = '\n';
     cout << "Message: " << bufy << endl;
 
-/*
+
 
     Message *m1 = new Message(buf, 133);
     char *c1 = m1->msgStripHdr(24);
@@ -92,9 +92,9 @@ int main ( )
 
     char* buf1 = new char[140];
     m1->msgFlat(buf1);
-    buf[m1->msgLen ( )] = '\n';
+    buf1[m1->msgLen ( )] = '\n';
     cout << "Message: " << buf1 << endl;
-
+/*
     m1->msgJoin(m2);
     char* bufz = new char[400];
     m1->msgFlat(bufz);
