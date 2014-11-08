@@ -1,1 +1,36 @@
-test of ssh 
+Name: Robert Werthman
+
+CSCI 4273 (Network Systems)
+Programming Assignment 3
+
+----Executables----
+./message - Tests the output of the message library
+./threadpool - Tests the output of the threadpool library
+./eventscheduler - Tests the output of the eventscheduler library
+
+----Header Files----
+threadpool.h - Contains the class and function declarations for a threadpool object
+eventscheduler.h - Contains the class and function declarations for a eventscheduler object
+message.h - Contains the class and function delcarations for a message object
+
+----How To Run Program----
+To Compile Files:
+	make all
+To Clear The Compilation:
+	make clean
+message:
+	./message
+threadpool:
+	./threadpool
+eventscheduler:
+	./eventscheduler
+
+----Testing----
+The libraries were tested with the given drivers and the output
+will be submitted.
+
+----Unimplemented Specifications----
+None
+
+----Known Bugs----
+None
