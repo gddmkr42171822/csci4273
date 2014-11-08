@@ -3,11 +3,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#include <queue>
-#include <algorithm>
-#include <vector>
-#include <stdio.h>
-#include <semaphore.h>
 
 using namespace std;
 

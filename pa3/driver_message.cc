@@ -4,8 +4,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <string.h>
-#include <list>
-#include <iterator>
 
 using namespace std;
 
@@ -13,24 +11,7 @@ using namespace std;
 
 int main ( )
 {
-/*
-    char *b1 = new char[101];
-    for (int i = 0; i < 100; i++) b1[i] = 'a';
-    b1[101] = '\0';
-
-    char *h1 = new char[6];
-    for (int i = 0; i < 5; i++) h1[i] = 'h';
-    h1[6] = '\0';
-
-    char *h2 = new char[5];
-    for (int i = 0; i < 4; i++) h2[i] = 'k';
-    h2[5] = '\0';
-
-    char *h3 = new char[25];
-    for (int i = 0; i < 24; i++) h3[i] = 'm';
-    h3[25] = '\0';
-*/    
-    char *b1 = new char[100];
+   char *b1 = new char[100];
     for (int i = 0; i < 100; i++) b1[i] = 'a';
 
     char *h1 = new char[5];
@@ -94,12 +75,17 @@ int main ( )
     m1->msgFlat(buf1);
     buf1[m1->msgLen ( )] = '\n';
     cout << "Message: " << buf1 << endl;
-/*
+
+    cout << "m2 length before join is " << m2.msgLen() << endl;
+    cout << "m1 length before join is " << m1->msgLen() << endl;
+
     m1->msgJoin(m2);
     char* bufz = new char[400];
     m1->msgFlat(bufz);
     bufz[m1->msgLen ( )] = '\n';
     cout << "Message: " << bufz << endl;
+    cout << "m1 length after join is " << m1->msgLen() << endl;
+    cout << "m length before join is " << m->msgLen() << endl;
 
     m->msgJoin(*m1);
     cout << "Message length of m = " << m->msgLen( ) << endl;
@@ -108,7 +94,7 @@ int main ( )
     m->msgFlat(bufa);
     bufa[m->msgLen ( )] = '\n';
     cout << "Message: " << bufa << endl;
-*/
+
 }
 
 

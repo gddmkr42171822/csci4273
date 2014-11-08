@@ -6,10 +6,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <semaphore.h>
-#include <vector>
-#include <queue>
-#include <errno.h>
-#include <cstring>
 
 using namespace std;
 

@@ -1,5 +1,11 @@
 #ifndef eventscheduler_h
 #define eventscheduler_h
+
+#include <queue>
+#include <algorithm>
+#include <vector>
+#include <stdio.h>
+
 class EventScheduler 
 {
 	public:

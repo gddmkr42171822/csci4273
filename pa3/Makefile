@@ -1,5 +1,5 @@
 CC = g++
-FLAGS = -g -Wall -Wextra
+FLAGS = -g -Wall -Wextra -Wno-sign-compare
 PTHREAD = -pthread
 RM = rm -f
 

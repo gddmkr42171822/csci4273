@@ -4,6 +4,8 @@
 
 /* Written by: Shiv Mishra on October 20, 2014 */
 /* Last update: October 20, 2014 */
+#include <list>
+#include <iterator>
 
 class Message
 {
@@ -20,11 +22,11 @@ public:
 private:
     list<char> message_container;
     size_t msglen;
-    char *msg_content;
 };
 
     Message::Message()
     {
+	    msglen = 0;
     }
 
     Message::Message(char* msg, size_t len)
@@ -37,6 +39,7 @@ private:
 
     Message::~Message( )
     {
+	    message_container.clear();
     }
 
     void Message::msgAddHdr(char *hdr, size_t length)
@@ -49,7 +52,9 @@ private:
 
     char* Message::msgStripHdr(int len)
     {
-        if ((msglen < len) || (len == 0)) return NULL;
+        if ((msglen < len) || (len == 0)) {
+		return NULL;
+	}
 	char *stripped_content = new char[len];
 	list<char> stripped_header_list;
 	list<char>::iterator last_char_of_header = message_container.begin();
@@ -67,7 +72,9 @@ private:
 
     int Message::msgSplit(Message& secondMsg, size_t len)
     {
-	if ((len < 0) || (len > msglen)) return 0;
+	if (len > msglen) {
+		return 0;
+	}
 	list<char>::iterator it = message_container.begin();
 	advance(it, len);
 	secondMsg.message_container.splice(secondMsg.message_container.begin(), message_container, \
@@ -77,16 +84,9 @@ private:
 
     void Message::msgJoin(Message& secondMsg)
     {
-	char *content = msg_content;
-	size_t length = msglen;
-	
-	msg_content = new char[msglen + secondMsg.msglen];
+	message_container.splice(message_container.end(), secondMsg.message_container, \
+	secondMsg.message_container.begin(), secondMsg.message_container.end());
 	msglen += secondMsg.msglen;
-	memcpy(msg_content, content, length);
-	memcpy(msg_content + length, secondMsg.msg_content, secondMsg.msglen);
-	delete content;
-	delete secondMsg.msg_content;
-	secondMsg.msg_content = NULL;
 	secondMsg.msglen = 0;
     }
 

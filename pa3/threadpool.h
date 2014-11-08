@@ -1,5 +1,11 @@
 #ifndef threadpool_h
 #define threadpool_h
+
+#include <vector>
+#include <queue>
+#include <errno.h>
+#include <cstring>
+
 class ThreadPool 
 {
 	public:
