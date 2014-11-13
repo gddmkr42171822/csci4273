@@ -1,3 +1,5 @@
+#ifndef message_h
+#define message_h
 /*********************/
 /* This is the most primitive implementation of the Message library.
 */
@@ -103,4 +105,4 @@ private:
 		i++;
 	}
     }
-
+#endif
