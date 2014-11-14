@@ -84,9 +84,9 @@ void *ThreadPool::thread_work(void)
 		}
 		else { 
 			threads_available--;
-			void (*dispatch)(void*);
-			dispatch_struct *work;
 			if(workQueue.size() > 0) {
+				void (*dispatch)(void*);
+				dispatch_struct *work;
 				work = workQueue.front();
 				workQueue.pop();
 				dispatch = work->dispatch_function;

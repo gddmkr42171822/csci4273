@@ -37,4 +37,8 @@ will be submitted.
 None
 
 ----Known Bugs----
-None
+1. Neither the eventsheduler nor the threadpool are completely thread-safe.    
+   In the eventscheduler, I do not lock the queue when I am erasing an object
+   and I believe this causes a seg fault when sort is called on the queue.
+   In the threadpool, I can't locate where it is seg faulting. It doesn't seem to
+   seg fault on linux but on my mac it does.
