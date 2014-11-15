@@ -1,5 +1,6 @@
 #include "message.h"
 using namespace std;
+
 Message::Message()
 {
     msglen = 0;
@@ -44,7 +45,6 @@ char* Message::msgStripHdr(int len)
         return NULL;
     }else if(found > (size_t)len){
         char* origData = (*it)->data;
-        //Need to copy part of a header 
         size_t prefixLen = (*it)->len - (found - len);
         size_t remainderLen = found - len;
         memcpy(buf + found - ((*it)->len), origData, prefixLen);
@@ -67,7 +67,6 @@ int Message::msgSplit(Message& secondMsg, size_t len) {
         return 0;
     }
     if(found > len){
-        //Need to split a field
         --it;
         char* origData = (*it)->data;
         ++it;
@@ -103,7 +102,6 @@ size_t Message::msgLen( ) {
 }
 
 void Message::msgFlat(char *buffer) {
-    //Assume that sufficient memory has been allocated in buffer
     size_t offset = 0;
     for(list<field*>::iterator it = fieldList.begin();it != fieldList.end() ;++it){
         size_t len = (*it)->len;
@@ -111,4 +109,3 @@ void Message::msgFlat(char *buffer) {
         offset += len;
     }
 }
-

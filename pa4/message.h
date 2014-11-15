@@ -6,7 +6,6 @@
 using namespace std;
 class Message {
 public:
-   
     Message( );
     Message(char* msg, size_t len);
     ~Message( );
@@ -16,7 +15,6 @@ public:
     void msgJoin(Message& secondMsg);
     size_t msgLen( );
     void msgFlat(char *buffer);
-
 private:
     size_t msglen;
     class field{
