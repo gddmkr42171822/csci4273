@@ -86,14 +86,14 @@ void *ThreadPool::thread_work(void)
 		}
 		else { 
 			threads_available--;
-			if(workQueue.size() > 0) {
+			if(!workQueue.empty()) {
 				void (*dispatch)(void*);
 				dispatch_struct *work;
 				work = workQueue.front();
-				workQueue.pop();
 				dispatch = work->dispatch_function;
 				dispatch(work->arg);
 				delete work;
+				workQueue.pop();
 			}
 			pthread_mutex_unlock(&queue_mutex);
 			threads_available++;
