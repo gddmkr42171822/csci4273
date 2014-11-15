@@ -87,7 +87,6 @@ int Message::msgSplit(Message& secondMsg, size_t len) {
     }
     secondMsg.msglen = msglen - len;
     msglen = len;
-
     return 1;
 }
 
