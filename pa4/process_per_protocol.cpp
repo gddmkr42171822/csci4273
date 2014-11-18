@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
 	}
 	while (!th.thread_avail());
 	th.dispatch_thread(create_udp_socket, (void *)&in_udp_socket);
-
+	sem_destroy(&sem);
 	return 0;
 }
 
