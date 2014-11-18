@@ -9,9 +9,9 @@ using namespace std;
 
 #include "message.h"
 
-int main ( )
+main ( )
 {
-   char *b1 = new char[100];
+    char *b1 = new char[100];
     for (int i = 0; i < 100; i++) b1[i] = 'a';
 
     char *h1 = new char[5];
@@ -23,6 +23,10 @@ int main ( )
     char *h3 = new char[24];
     for (int i = 0; i < 24; i++) h3[i] = 'm';
 
+	struct timeval start, end;
+	long mtime, seconds, useconds;
+	gettimeofday(&start,NULL);
+	
     Message *m = new Message(b1, 100);
     m->msgAddHdr(h1, 5);
     m->msgAddHdr(h2, 4);
@@ -33,7 +37,7 @@ int main ( )
     m->msgFlat(buf);
     buf[m->msgLen ( )] = '\n';
     cout << "Message: " << buf << endl;
-    
+
     Message m2;
 
     m->msgSplit(m2, 50);
@@ -73,19 +77,14 @@ int main ( )
 
     char* buf1 = new char[140];
     m1->msgFlat(buf1);
-    buf1[m1->msgLen ( )] = '\n';
+    buf[m1->msgLen ( )] = '\n';
     cout << "Message: " << buf1 << endl;
-
-    cout << "m2 length before join is " << m2.msgLen() << endl;
-    cout << "m1 length before join is " << m1->msgLen() << endl;
 
     m1->msgJoin(m2);
     char* bufz = new char[400];
     m1->msgFlat(bufz);
     bufz[m1->msgLen ( )] = '\n';
     cout << "Message: " << bufz << endl;
-    cout << "m1 length after join is " << m1->msgLen() << endl;
-    cout << "m length before join is " << m->msgLen() << endl;
 
     m->msgJoin(*m1);
     cout << "Message length of m = " << m->msgLen( ) << endl;
@@ -94,6 +93,11 @@ int main ( )
     m->msgFlat(bufa);
     bufa[m->msgLen ( )] = '\n';
     cout << "Message: " << bufa << endl;
+	
+	gettimeofday(&end,NULL);
+	useconds = end.tv_usec - start.tv_usec;
+	mtime = (useconds);
+	cout << "elapsed time: " << mtime << "milliseconds\n" << endl;
 
 }
 
