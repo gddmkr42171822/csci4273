@@ -101,33 +101,30 @@ void udp_out(int port_number, char *buffer, int s) {
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 	servaddr.sin_port = htons(port_number);
-	sendto_error = sendto(s, buffer, sizeof(buffer), 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
+	sendto_error = sendto(s, buffer, BUFSIZE, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
 	if(sendto_error == -1) {
 		fprintf(stderr, "error sending udp message: %s\n", strerror(errno));
 	}
 }
 
 char *udp_read(int s) {
-	char *buf = new char[BUFSIZE+1];
-	bzero(&buf, sizeof(buf));
+	char *buf = new char[BUFSIZE]; 
+	bzero(buf, BUFSIZE);
 	int recvfrom_error;
 	struct sockaddr_in servaddr;
 	bzero(&servaddr, sizeof(servaddr));
 	socklen_t addrlen = sizeof(servaddr);
-	recvfrom_error = recvfrom(s, buf, sizeof(buf), 0, (struct sockaddr *)&servaddr, &addrlen);
+	recvfrom_error = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *)&servaddr, &addrlen);
 	if(recvfrom_error == -1) {
 		fprintf(stderr, "error receiving udp message: %s\n", strerror(errno));
 	}
-	buf[BUFSIZE+1] = '\0';
 	return buf;
 }
 
 void udp_readwrite_test() {
-	char *buf = new char[16];
+	char *buf = new char[BUFSIZE-1];
 	strncpy(buf, "This is a test!", 15);
-	buf[16] = '\0';
-	cout << out_socket << endl;
-	cout << in_socket << endl;
+	buf[BUFSIZE] = '\0';
 	udp_out(serv_in_udp_port, buf, out_socket);
 	buf = udp_read(in_socket);
 	cout << buf << endl;
