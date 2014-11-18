@@ -16,18 +16,21 @@
 #include <iostream>
 
 #include "threadpool.h"
+#include <semaphore.h>
 
 #define BUFSIZE 4096
+#define DEFAULT_NUM_THREADS 30
 
 void create_udp_socket(void *socket_type);
-
+sem_t sem;
 
 using namespace std;
 
 int main(int argc, char *argv[]) {
+	sem_init(&sem, 0, 1);
 	int in_udp_socket = 2;
 	int out_udp_socket = 1;
-	ThreadPool th(20);
+	ThreadPool th(DEFAULT_NUM_THREADS);
 	do {
 	/* Wait until a thread is avaible to create a udp socket */
 	}
@@ -46,6 +49,7 @@ void create_udp_socket(void *socket_type) {
 	struct sockaddr_in clientaddr;
 	struct hostent *phe;
 	int s, errno;
+	int serv_out_udp_socket, serv_in_udp_socket;
 	memset(&clientaddr, 0, sizeof(clientaddr));
 	clientaddr.sin_family = AF_INET;
 	clientaddr.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -64,9 +68,18 @@ void create_udp_socket(void *socket_type) {
 		}
 		if((*(int *)socket_type) == 1) {
 			printf("New out udp socket port number is %d\n", ntohs(clientaddr.sin_port));
+			sem_wait(&sem);
+			cout << "Enter out udp socket port number: ";
+			cin >> serv_out_udp_socket;
+			sem_post(&sem);
 		}
 		else {
 			printf("New in udp socket port number is %d\n", ntohs(clientaddr.sin_port));
+			sem_wait(&sem);
+			cout << "Enter in udp socket port number: ";
+			cin >> serv_in_udp_socket;
+			sem_post(&sem);
 		}
 	}
 }
+
