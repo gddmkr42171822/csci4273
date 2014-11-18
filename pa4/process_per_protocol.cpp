@@ -62,7 +62,7 @@ void create_udp_socket(void *socket_type) {
 	int s, errno;
 	memset(&clientaddr, 0, sizeof(clientaddr));
 	clientaddr.sin_family = AF_INET;
-	clientaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	clientaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	clientaddr.sin_port = htons(0);
 	if((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
 		fprintf(stderr, "cannot creat UDP socket: %s\n", strerror(errno));
@@ -99,22 +99,22 @@ void udp_out(int port_number, char *buffer, int s) {
 	struct sockaddr_in servaddr;
 	bzero(&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
-	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(port_number);
-	sendto_error = sendto(s, buffer, BUFSIZE, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
+	sendto_error = sendto(s, buffer, BUFSIZE+1, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
 	if(sendto_error == -1) {
 		fprintf(stderr, "error sending udp message: %s\n", strerror(errno));
 	}
 }
 
 char *udp_read(int s) {
-	char *buf = new char[BUFSIZE]; 
-	bzero(buf, BUFSIZE);
+	char *buf = new char[BUFSIZE+1]; 
+	bzero(buf, BUFSIZE+1);
 	int recvfrom_error;
 	struct sockaddr_in servaddr;
 	bzero(&servaddr, sizeof(servaddr));
 	socklen_t addrlen = sizeof(servaddr);
-	recvfrom_error = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *)&servaddr, &addrlen);
+	recvfrom_error = recvfrom(s, buf, BUFSIZE+1, 0, (struct sockaddr *)&servaddr, &addrlen);
 	if(recvfrom_error == -1) {
 		fprintf(stderr, "error receiving udp message: %s\n", strerror(errno));
 	}
@@ -122,9 +122,9 @@ char *udp_read(int s) {
 }
 
 void udp_readwrite_test() {
-	char *buf = new char[BUFSIZE-1];
+	char *buf = new char[BUFSIZE+1];
 	strncpy(buf, "This is a test!", 15);
-	buf[BUFSIZE] = '\0';
+	buf[BUFSIZE+1] = '\0';
 	udp_out(serv_in_udp_port, buf, out_socket);
 	buf = udp_read(in_socket);
 	cout << buf << endl;
