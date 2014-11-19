@@ -18,7 +18,7 @@
 #define DEFAULT_NUM_THREADS 30
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
-#define ETHERNET_HEADER_LEN 16
+#define HEADER_LEN 40
 using namespace std;
 
 struct header {
@@ -27,7 +27,7 @@ struct header {
 	int message_len;
 };
 
-void pipe_receive(int pipe_receive_read_end, int pipe_receive_write_end, int protocol_header_len) {
+void pipe_receive(int pipe_receive_read_end, int pipe_receive_write_end) {
 	char *buffer = new char[BUFSIZE];
 	char *write_buffer = new char[BUFSIZE];
 	bzero(buffer, BUFSIZE);
@@ -35,23 +35,24 @@ void pipe_receive(int pipe_receive_read_end, int pipe_receive_write_end, int pro
 		fprintf(stderr, "error reading from ethernet receive pipe: %s\n", strerror(errno));
 	}
 	Message *m = new Message(buffer, BUFSIZE);
-	char *stripped_header = m->msgStripHdr(protocol_header_len);
+	char *stripped_header = m->msgStripHdr(HEADER_LEN);
+	header *temp_header = new header;
+	memcpy(temp_header, stripped_header, sizeof(HEADER_LEN));
+	cout << "Temp_header->hlp: " << temp_header->hlp << endl;
 	m->msgFlat(write_buffer);
 	cout << "Message after strip: " << write_buffer << endl;
-	stripped_header[protocol_header_len] = '\0';
-	cout << "Stripped header: " << stripped_header << endl;
 	if(write(pipe_receive_write_end, write_buffer, BUFSIZE) == -1) {
 		fprintf(stderr, "error writing to ip receive pipe: %s\n", strerror(errno));
 	}
 }
-void pipe_send(int pipe_send_write_end, int pipe_send_read_end) { 
+void pipe_send(int pipe_send_write_end, int pipe_send_read_end, int higher_protocol_id, int other_info) { 
 	int n;
 	char *buffer = new char[BUFSIZE];
 	char *send_buffer = new char[BUFSIZE];
 	header *ethernet_header = new header;
 	bzero(ethernet_header, sizeof(header));
-	ethernet_header->hlp = 2;
-	ethernet_header->other_info.resize(8);
+	ethernet_header->hlp = higher_protocol_id;
+	ethernet_header->other_info.resize(other_info);
 	bzero(buffer, BUFSIZE);
 	n = read(pipe_send_read_end, buffer, BUFSIZE);
 	if(n == -1) {
@@ -149,32 +150,40 @@ void pipe_sendreceive_test() {
 	int *ip_send_pipe = create_pipe();
 	char buffer[19];
 	bzero(buffer, 19);
+	/*
 	write(ethernet_receive_pipe[1], "aaaaaaaaaaaaaaaahi!", 19); 
-	pipe_receive(ethernet_receive_pipe[0], ip_receive_pipe[1], ETHERNET_HEADER_LEN);
+	pipe_receive(ethernet_receive_pipe[0], ip_receive_pipe[1]);
 	read(ip_receive_pipe[0], buffer, 3);
+	*/
+	memcpy(buffer, "hi!", 3);
 	cout << buffer << endl;
 	write(ip_send_pipe[1], buffer, 3);
-	pipe_send(ethernet_send_pipe[1], ip_send_pipe[0]);
+	//pipe_send(ethernet_send_pipe[1], ip_send_pipe[0], 3, 12);
+	pipe_send(ethernet_receive_pipe[1], ip_send_pipe[0], 3, 12);
+	pipe_receive(ethernet_receive_pipe[0], ip_send_pipe[1]);
 	char buffer1[43];
 	char test_buffer[43];
 	bzero(buffer1, 43);
-	read(ethernet_send_pipe[0], buffer1, 43);
-	Message *m = new Message(buffer1, 43);
+	read(ip_send_pipe[0], buffer1, 3);
+	//read(ethernet_send_pipe[0], buffer1, 43);
+	Message *m = new Message(buffer1, 3);
 	cout << m->msgLen() << endl;
-	char *stripped_header = new char[sizeof(header)];	
-	stripped_header = m->msgStripHdr(sizeof(header));
-	cout << m->msgLen() << endl;
+	//char *stripped_header = new char[sizeof(header)];	
+	//stripped_header = m->msgStripHdr(sizeof(header));
+	//cout << m->msgLen() << endl;
 	m->msgFlat(test_buffer);
 	test_buffer[m->msgLen()] = '\0'; 
 	cout << test_buffer << endl;
+	/*
 	header *temp_header = new header;
 	memcpy(temp_header, stripped_header, sizeof(header));
 	cout << "Ethernet hlp: " << temp_header->hlp << endl;
-	cout << "Expected 2" << endl;
+	cout << "Expected 3" << endl;
 	cout << "Message len: " << temp_header->message_len << endl;
 	cout << "Expected 3" << endl; 
 	cout << "Size of OI: "<< temp_header->other_info.size() << endl;
-	cout << "Expected 8" << endl;
+	cout << "Expected 12" << endl;
+	*/
 }
 
 void socket_readwrite_test() {
@@ -199,7 +208,7 @@ void socket_readwrite_test() {
 }
 
 int main() {
-	socket_readwrite_test();
+//	socket_readwrite_test();
 	pipe_sendreceive_test();
 	return 0;
 }
