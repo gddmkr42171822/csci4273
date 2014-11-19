@@ -20,44 +20,27 @@
 
 #define BUFSIZE 4096
 #define DEFAULT_NUM_THREADS 30
+#define in_socket_type 2
+#define out_socket_type 1
 
-void create_udp_socket(void *socket_type);
+int create_udp_socket(int socket_type);
+void udp_readwrite_test(int out_socket, int in_socket, int serv_in_udp_port);
 void udp_out(int port_number, char *buffer, int s);
 char *udp_read(int port_number, int s); 
-void udp_readwrite_test(); 
-
-sem_t sem;
-static int serv_in_udp_port;
-static int in_socket;
-static int out_socket;
-static bool udp_ports_ready;
 
 using namespace std;
 
 int main() {
-	sem_init(&sem, 0, 1);
-	int in_udp_socket = 2;
-	int out_udp_socket = 1;
-	ThreadPool th(DEFAULT_NUM_THREADS);
-	do {
-	/* Wait until a thread is avaible to create a udp socket */
-	}
-	while (!th.thread_avail());
-	th.dispatch_thread(create_udp_socket, (void *)&out_udp_socket);
-	do {
-	/* Wait until a thread is avaible to create a udp socket */
-	}
-	while (!th.thread_avail());
-	th.dispatch_thread(create_udp_socket, (void *)&in_udp_socket);
-	while(!udp_ports_ready) {
-
-	}
-	udp_readwrite_test();
-	sem_destroy(&sem);
+	int in_udp_socket, out_udp_socket, serv_in_udp_port;
+	out_udp_socket = create_udp_socket(out_socket_type);
+	in_udp_socket = create_udp_socket(in_socket_type);
+	cout << "Enter the port number of the server in udp socket: ";
+	cin >> serv_in_udp_port;
+	udp_readwrite_test(out_udp_socket, in_udp_socket, serv_in_udp_port);
 	return 0;
 }
 
-void create_udp_socket(void *socket_type) {
+int create_udp_socket(int socket_type) {
 	struct sockaddr_in clientaddr;
 	int s, errno;
 	memset(&clientaddr, 0, sizeof(clientaddr));
@@ -76,20 +59,13 @@ void create_udp_socket(void *socket_type) {
 		if((getsockname(s, (struct sockaddr *)&clientaddr, &socklen)) < 0) {
 			fprintf(stderr, "getsockname error: %s\n", strerror(errno));
 		}
-		if((*(int *)socket_type) == 1) {
-			sem_wait(&sem);
+		if(socket_type == 1) {
 			printf("New OUT udp socket port number is %d\n", ntohs(clientaddr.sin_port));
-			out_socket = s;
-			sem_post(&sem);
+			return s;
 		}
 		else {
-			sem_wait(&sem);
 			printf("New IN udp socket port number is %d\n", ntohs(clientaddr.sin_port));
-			cout << "Enter IN udp port number of server: ";
-			cin >> serv_in_udp_port;
-			in_socket = s;
-			sem_post(&sem);
-			udp_ports_ready = true;
+			return s;
 		}
 	}
 }
@@ -101,30 +77,29 @@ void udp_out(int port_number, char *buffer, int s) {
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(port_number);
-	sendto_error = sendto(s, buffer, BUFSIZE+1, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
+	sendto_error = sendto(s, buffer, BUFSIZE, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
 	if(sendto_error == -1) {
 		fprintf(stderr, "error sending udp message: %s\n", strerror(errno));
 	}
 }
 
 char *udp_read(int s) {
-	char *buf = new char[BUFSIZE+1]; 
-	bzero(buf, BUFSIZE+1);
+	char *buf = new char[BUFSIZE]; 
+	bzero(buf, BUFSIZE);
 	int recvfrom_error;
 	struct sockaddr_in servaddr;
 	bzero(&servaddr, sizeof(servaddr));
 	socklen_t addrlen = sizeof(servaddr);
-	recvfrom_error = recvfrom(s, buf, BUFSIZE+1, 0, (struct sockaddr *)&servaddr, &addrlen);
+	recvfrom_error = recvfrom(s, buf, BUFSIZE, 0, (struct sockaddr *)&servaddr, &addrlen);
 	if(recvfrom_error == -1) {
 		fprintf(stderr, "error receiving udp message: %s\n", strerror(errno));
 	}
 	return buf;
 }
 
-void udp_readwrite_test() {
-	char *buf = new char[BUFSIZE+1];
+void udp_readwrite_test(int out_socket, int in_socket, int serv_in_udp_port) {
+	char *buf = new char[BUFSIZE];
 	strncpy(buf, "This is a test!", 15);
-	buf[BUFSIZE+1] = '\0';
 	udp_out(serv_in_udp_port, buf, out_socket);
 	buf = udp_read(in_socket);
 	cout << buf << endl;
