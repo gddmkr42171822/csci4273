@@ -4,11 +4,12 @@
 
 /* Written by: Shiv Mishra on October 20, 2014 */
 /* Last update: October 20, 2014 */
+#include <list>
+#include <iterator>
 
 class Message
 {
 public:
-   
     Message( );
     Message(char* msg, size_t len);
     ~Message( );
@@ -18,100 +19,88 @@ public:
     void msgJoin(Message& secondMsg);
     size_t msgLen( );
     void msgFlat(char *buffer);
-
 private:
+    list<char> message_container;
     size_t msglen;
-    char *msg_content;
 };
 
     Message::Message()
     {
-	msglen = 0;
-	msg_content = NULL;
+	    msglen = 0;
     }
 
     Message::Message(char* msg, size_t len)
     {
 	msglen = len;
-	msg_content = new char[len];
-	memcpy(msg_content, msg, len);
+	for(unsigned int i = 0; i < len; i++) {
+		message_container.push_back(msg[i]);
+	}
     }
 
     Message::~Message( )
     {
-            delete msg_content;
+	    message_container.clear();
     }
 
     void Message::msgAddHdr(char *hdr, size_t length)
     {
-	char *new_msg_content;
-
-	new_msg_content = new char[msglen + length];
-        memcpy(new_msg_content, hdr, length);
-	memcpy(new_msg_content + length, msg_content, msglen);
-	delete msg_content;
-	msg_content = new_msg_content;
 	msglen += length;
+	for(unsigned int i = 0; i < length; i++) {
+		message_container.push_front(hdr[i]);
+	}
     }
 
     char* Message::msgStripHdr(int len)
     {
-	char *new_msg_content;
-	char *stripped_content;
-	
-        if ((msglen < len) || (len == 0)) return NULL;
-
-	new_msg_content = new char[msglen - len];
-	stripped_content = new char[len];
-	memcpy(stripped_content, msg_content, len);
-	memcpy(new_msg_content, msg_content + len, msglen - len);
+        if ((msglen < len) || (len == 0)) {
+		return NULL;
+	}
+	char *stripped_content = new char[len];
+	list<char> stripped_header_list;
+	list<char>::iterator last_char_of_header = message_container.begin();
+	advance(last_char_of_header, len);
+	stripped_header_list.splice(stripped_header_list.begin(), message_container, message_container.begin(), \
+	last_char_of_header);
+	int i = 0;
+	for(list<char>::iterator it = stripped_header_list.begin(); it != stripped_header_list.end(); it++) {
+		stripped_content[i] = *it;
+		i++;
+	}
 	msglen -= len;
-	delete msg_content;
-	msg_content = new_msg_content;
 	return stripped_content;
     }
 
     int Message::msgSplit(Message& secondMsg, size_t len)
     {
-	char *content = msg_content;
-	size_t length = msglen;
-
-	if ((len < 0) || (len > msglen)) return 0;
-
-	msg_content = new char[len];
-	msglen = len;
-	memcpy(msg_content, content, len);
-	secondMsg.msglen = length - len;
-	secondMsg.msg_content = new char[secondMsg.msglen];
-	memcpy(secondMsg.msg_content, content + len, secondMsg.msglen);
-	delete content;
+	if (len > msglen) {
+		return 0;
+	}
+	list<char>::iterator it = message_container.begin();
+	advance(it, len);
+	secondMsg.message_container.splice(secondMsg.message_container.begin(), message_container, \
+	it, message_container.end());
 	return 1;
     }
 
     void Message::msgJoin(Message& secondMsg)
     {
-	char *content = msg_content;
-	size_t length = msglen;
-	
-	msg_content = new char[msglen + secondMsg.msglen];
+	message_container.splice(message_container.end(), secondMsg.message_container, \
+	secondMsg.message_container.begin(), secondMsg.message_container.end());
 	msglen += secondMsg.msglen;
-	memcpy(msg_content, content, length);
-	memcpy(msg_content + length, secondMsg.msg_content, secondMsg.msglen);
-	delete content;
-	delete secondMsg.msg_content;
-	secondMsg.msg_content = NULL;
 	secondMsg.msglen = 0;
     }
 
     size_t Message::msgLen( )
     {
-	return msglen;
+	return message_container.size();
     }
 
     void Message::msgFlat(char *buffer)
     {
-	//Assume that sufficient memory has been allocated in buffer
-
-	memcpy(buffer, msg_content, msglen);
+	int i = 0;
+	for(list<char>::iterator it = message_container.begin(); it != message_container.end(); it++) {
+		buffer[i] = *it;
+		i++;
+	}
     }
 
