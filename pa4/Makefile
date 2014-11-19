@@ -18,4 +18,4 @@ message.o: message.cpp
 	$(CC) $(FLAGS) -o $@ -c $^
 
 clean:
-	$(RM) threadpool.o message.o process_per_protocol 
+	$(RM) message.o process_per_protocol 
