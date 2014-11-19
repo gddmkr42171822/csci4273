@@ -5,4 +5,5 @@
 - [ ] Implement Ip protocol receive with pipe
 - [ ] Find header lengths for all protocols
 - [ ] Generalize pipe send and receive
+- [ ] Implement technique to create 2 threads per protocol
 
