@@ -28,7 +28,19 @@ using namespace std;
 	2,3 (ethernet send pipe read, write)
 	4,5 (ip receive pipe read, write)
 	6,7 (ip send pipe read, write)
-	*/
+	8,9 (upd receive pipe read, write)
+	10,11 (udp send pipe read, write)
+	12, 13 (tcp receive pipe read, write)
+	14, 15 (tcp send pipe read, write)
+	16, 17 (ftp receive pipe read, write)
+	18, 19 (ftp send pipe read, write)
+	20, 21 (telnet receive pipe read, write)
+	22, 23 (telnet send pipe read, write)
+	24, 25 (RDP receive pipe read, write)
+	26, 27 (RDP send pipe read, write)
+	28, 29 (DNS receive pipe read, write)
+	30, 31 (DNS send pipe read, write)
+*/
 
 struct header {
 	int hlp;
@@ -50,23 +62,39 @@ void receive_pipe_read(int receive_pipe_read_end, int *pipearray) {
 	cout << "Temp_header->hlp: " << temp_header->hlp << endl;
 	m->msgFlat(write_buffer);
 	cout << "Message after strip: " << write_buffer << endl;
-	receive_pipe_write(pipearray, hlp);
+	receive_pipe_write(pipearray, temp_header->hlp);
 }
 
 void receive_pipe_write(int *pipearray, int hlp) {
 	switch (hlp) {
 		case 2: //write to IPs receive pipe
-			if(write(receive_pipe_write_end, write_buffer, BUFSIZE) == -1) {
+			if(write(pipearray[5], write_buffer, BUFSIZE) == -1) {
 				fprintf(stderr, "error writing to ip receive pipe: %s\n", strerror(errno));
 			}
 		case 3: //write to TCP's receive pipe
+			if(write(pipearray[13], write_buffer, BUFSIZE) == -1) {
+				fprintf(stderr, "error writing to tcp receive pipe: %s\n", strerror(errno));
+			}
 		case 4: //write to UDP's receive pipe
+			if(write(pipearray[9], write_buffer, BUFSIZE) == -1) {
+				fprintf(stderr, "error writing to udp receive pipe: %s\n", strerror(errno));
+			}
 		case 5: //write to FTP's receive pipe
+			if(write(pipearray[17], write_buffer, BUFSIZE) == -1) {
+				fprintf(stderr, "error writing to ftp receive pipe: %s\n", strerror(errno));
+			}
 		case 6: //write to telent's receive pipe
+			if(write(pipearray[21], write_buffer, BUFSIZE) == -1) {
+				fprintf(stderr, "error writing to telnet receive pipe: %s\n", strerror(errno));
+			}
 		case 7: //write to RDP's receive pipe
-		case 8: //write to DNS's receive pip
-			
-			
+			if(write(pipearray[25], write_buffer, BUFSIZE) == -1) {
+				fprintf(stderr, "error writing to rdp receive pipe: %s\n", strerror(errno));
+			}
+		case 8: //write to DNS's receive pipe
+			if(write(pipearray[29], write_buffer, BUFSIZE) == -1) {
+				fprintf(stderr, "error writing to dns receive pipe: %s\n", strerror(errno));
+			}
 }
 
 char *append_header(int higher_protocol_id, int other_info, char *buffer, int bytes_read) {
@@ -230,7 +258,7 @@ void socket_readwrite_test() {
 
 int main() {
 	//socket_readwrite_test();
-	pipe_sendreceive_test();
+	//pipe_sendreceive_test();
 	//int *pipearray = create_protocol_pipes();
 	return 0;
 }
