@@ -19,7 +19,16 @@
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
 #define HEADER_LEN 40
+#define NUM_PROTOCOL_PIPES 16
 using namespace std;
+
+
+/* Pipearray designations: 
+	0,1 (ethernet recieve pipe read,write)
+	2,3 (ethernet send pipe read, write)
+	4,5 (ip receive pipe read, write)
+	6,7 (ip send pipe read, write)
+	*/
 
 struct header {
 	int hlp;
@@ -27,11 +36,11 @@ struct header {
 	int message_len;
 };
 
-void pipe_receive(int pipe_receive_read_end, int pipe_receive_write_end) {
+void receive_pipe_read(int receive_pipe_read_end, int *pipearray) {
 	char *buffer = new char[BUFSIZE];
 	char *write_buffer = new char[BUFSIZE];
 	bzero(buffer, BUFSIZE);
-	if(read(pipe_receive_read_end, buffer, BUFSIZE) == -1) {
+	if(read(receive_pipe_read_end, buffer, BUFSIZE) == -1) {
 		fprintf(stderr, "error reading from ethernet receive pipe: %s\n", strerror(errno));
 	}
 	Message *m = new Message(buffer, BUFSIZE);
@@ -41,41 +50,75 @@ void pipe_receive(int pipe_receive_read_end, int pipe_receive_write_end) {
 	cout << "Temp_header->hlp: " << temp_header->hlp << endl;
 	m->msgFlat(write_buffer);
 	cout << "Message after strip: " << write_buffer << endl;
-	if(write(pipe_receive_write_end, write_buffer, BUFSIZE) == -1) {
-		fprintf(stderr, "error writing to ip receive pipe: %s\n", strerror(errno));
-	}
+	receive_pipe_write(pipearray, hlp);
 }
-void pipe_send(int pipe_send_write_end, int pipe_send_read_end, int higher_protocol_id, int other_info) { 
-	int n;
-	char *buffer = new char[BUFSIZE];
+
+void receive_pipe_write(int *pipearray, int hlp) {
+	switch (hlp) {
+		case 2: //write to IPs receive pipe
+			if(write(receive_pipe_write_end, write_buffer, BUFSIZE) == -1) {
+				fprintf(stderr, "error writing to ip receive pipe: %s\n", strerror(errno));
+			}
+		case 3: //write to TCP's receive pipe
+		case 4: //write to UDP's receive pipe
+		case 5: //write to FTP's receive pipe
+		case 6: //write to telent's receive pipe
+		case 7: //write to RDP's receive pipe
+		case 8: //write to DNS's receive pip
+			
+			
+}
+
+char *append_header(int higher_protocol_id, int other_info, char *buffer, int bytes_read) {
 	char *send_buffer = new char[BUFSIZE];
 	header *ethernet_header = new header;
 	bzero(ethernet_header, sizeof(header));
 	ethernet_header->hlp = higher_protocol_id;
 	ethernet_header->other_info.resize(other_info);
-	bzero(buffer, BUFSIZE);
-	n = read(pipe_send_read_end, buffer, BUFSIZE);
-	if(n == -1) {
-		fprintf(stderr, "error reading from ip send pipe: %s\n", strerror(errno));
-		exit(1);
-	}
-	Message *m = new Message(buffer, n);
-	ethernet_header->message_len = n;
+	ethernet_header->message_len = bytes_read;
+	Message *m = new Message(buffer, bytes_read);
+	ethernet_header->message_len = bytes_read;
 	char struct_buffer[sizeof(*ethernet_header)];
 	memcpy(struct_buffer, ethernet_header, sizeof(*ethernet_header));
 	m->msgAddHdr(struct_buffer, sizeof(struct_buffer));
 	m->msgFlat(send_buffer);
-	if(write(pipe_send_write_end, send_buffer, BUFSIZE) == -1) {
+	return send_buffer;
+}
+
+void send_pipe(int send_pipe_write_end, int send_pipe_read_end, int other_info) { 
+	int bytes_read, higher_protocol_id;
+	char *read_buffer = new char[BUFSIZE];
+	char *read_buffer_minus_id = new char[BUFSIZE];
+	char *send_buffer;
+	bzero(read_buffer, BUFSIZE);
+	bytes_read = read(send_pipe_read_end, read_buffer, BUFSIZE);
+	if(bytes_read == -1) {
+		fprintf(stderr, "error reading from ip send pipe: %s\n", strerror(errno));
+		exit(1);
+	}
+	higher_protocol_id =  (int)atol(&read_buffer[0]);
+	memcpy(read_buffer_minus_id, read_buffer + 1, BUFSIZE-1);
+	send_buffer = append_header(higher_protocol_id, other_info, read_buffer_minus_id, bytes_read-1);
+	if(write(send_pipe_write_end, send_buffer, BUFSIZE) == -1) {
 		fprintf(stderr, "error writing to ethernet send pipe: %s\n", strerror(errno));
 	}
 }
 
-int *create_pipe() {
-	int *pipefd = new int[2];
-	if(pipe(pipefd) == -1) {
-		fprintf(stderr, "error creating pipe: %s\n", strerror(errno));
+int *create_protocol_pipes() {
+	int i;
+	int j = 0;
+	int *pipearray = new int[32];
+	for(i = 0; i < 16; i++) {
+		int *pipefd = new int[2];
+		if(pipe(pipefd) == -1) {
+			fprintf(stderr, "error creating pipe: %s\n", strerror(errno));
+		}
+		pipearray[j] = pipefd[0];
+		j++;
+		pipearray[j] = pipefd[1];
+		j++;
 	}
-	return pipefd;
+	return pipearray;
 }
 	
 int create_udp_socket(int socket_type) {
@@ -113,7 +156,7 @@ void socket_write(int port_number, int s, int ethernet_send_pipe_read_end) {
 	//while(1) {
 		bzero(buffer, BUFSIZE);
 		if(read(ethernet_send_pipe_read_end, buffer, BUFSIZE) == -1) {
-			fprintf(stderr, "error reading from pipe_send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from send_pipe pipe: %s\n", strerror(errno));
 		}
 		int sendto_error;
 		struct sockaddr_in servaddr;
@@ -144,49 +187,26 @@ void socket_read(int s, int ethernet_receive_pipe_write_end) {
 }
 
 void pipe_sendreceive_test() {
-	int *ethernet_send_pipe = create_pipe();
-	int *ethernet_receive_pipe = create_pipe();
-	int *ip_receive_pipe = create_pipe();
-	int *ip_send_pipe = create_pipe();
-	char buffer[19];
-	bzero(buffer, 19);
 	/*
-	write(ethernet_receive_pipe[1], "aaaaaaaaaaaaaaaahi!", 19); 
-	pipe_receive(ethernet_receive_pipe[0], ip_receive_pipe[1]);
-	read(ip_receive_pipe[0], buffer, 3);
-	*/
-	memcpy(buffer, "hi!", 3);
-	cout << buffer << endl;
-	write(ip_send_pipe[1], buffer, 3);
-	//pipe_send(ethernet_send_pipe[1], ip_send_pipe[0], 3, 12);
-	pipe_send(ethernet_receive_pipe[1], ip_send_pipe[0], 3, 12);
-	pipe_receive(ethernet_receive_pipe[0], ip_send_pipe[1]);
+	int *pipearray = create_protocol_pipes();
+	write(pipearray[1], "3", 1);
+	write(pipearray[1], "hi!", 3);
+	send_pipe(pipearray[5], pipearray[0], 12);
+	receive_pipe(pipearray[4], pipearray[3]);
 	char buffer1[43];
 	char test_buffer[43];
 	bzero(buffer1, 43);
-	read(ip_send_pipe[0], buffer1, 3);
-	//read(ethernet_send_pipe[0], buffer1, 43);
+	read(pipearray[2], buffer1, 3);
 	Message *m = new Message(buffer1, 3);
 	cout << m->msgLen() << endl;
-	//char *stripped_header = new char[sizeof(header)];	
-	//stripped_header = m->msgStripHdr(sizeof(header));
-	//cout << m->msgLen() << endl;
 	m->msgFlat(test_buffer);
 	test_buffer[m->msgLen()] = '\0'; 
 	cout << test_buffer << endl;
-	/*
-	header *temp_header = new header;
-	memcpy(temp_header, stripped_header, sizeof(header));
-	cout << "Ethernet hlp: " << temp_header->hlp << endl;
-	cout << "Expected 3" << endl;
-	cout << "Message len: " << temp_header->message_len << endl;
-	cout << "Expected 3" << endl; 
-	cout << "Size of OI: "<< temp_header->other_info.size() << endl;
-	cout << "Expected 12" << endl;
 	*/
 }
 
 void socket_readwrite_test() {
+	/*
 	int *ethernet_send_pipe = create_pipe();
 	int *ethernet_receive_pipe = create_pipe();
 	char *buf = new char[BUFSIZE];
@@ -205,11 +225,13 @@ void socket_readwrite_test() {
 	cout << "Expected: This is a test!" << endl;
 	write_socket.join();
 	read_socket.join();
+	*/
 }
 
 int main() {
-//	socket_readwrite_test();
+	//socket_readwrite_test();
 	pipe_sendreceive_test();
+	//int *pipearray = create_protocol_pipes();
 	return 0;
 }
 
