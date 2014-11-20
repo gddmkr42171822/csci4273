@@ -13,6 +13,7 @@ Process-Per-Protocol
 ~~Fix socket read and write to strip and add ethernet header~~
 - [x] Fix pipe send and receive to write protocol id first then message
 - [ ] Fix pipe_send to accomadate all pipes
+- [ ] Define pipearray designations as macros
 
 Process-Per-Message
 --------------------------

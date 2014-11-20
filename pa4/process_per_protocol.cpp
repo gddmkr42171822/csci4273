@@ -20,6 +20,7 @@
 #define OUT_SOCKET_TYPE 1
 #define HEADER_LEN 40
 #define NUM_PROTOCOL_PIPES 16
+#define NUM_PROTOCOL_PIPES_FDS 32
 using namespace std;
 
 
@@ -135,8 +136,8 @@ void send_pipe(int send_pipe_write_end, int send_pipe_read_end, int other_info) 
 int *create_protocol_pipes() {
 	int i;
 	int j = 0;
-	int *pipearray = new int[32];
-	for(i = 0; i < 16; i++) {
+	int *pipearray = new int[NUM_PROTOCOL_PIPES_FDS];
+	for(i = 0; i < NUM_PROTOCOL_PIPES; i++) {
 		int *pipefd = new int[2];
 		if(pipe(pipefd) == -1) {
 			fprintf(stderr, "error creating pipe: %s\n", strerror(errno));
