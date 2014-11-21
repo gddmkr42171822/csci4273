@@ -49,7 +49,7 @@ struct header {
 	int message_len;
 };
 
-void receive_pipe_write(int *pipearray, int hlp, char *write_buffer) {
+void write_to_receive_pipe(int *pipearray, int hlp, char *write_buffer) {
 	switch (hlp) {
 		case 2: //write to IPs receive pipe
 			if(write(pipearray[5], write_buffer, BUFSIZE) == -1) {
@@ -82,7 +82,7 @@ void receive_pipe_write(int *pipearray, int hlp, char *write_buffer) {
 	}
 }
 
-void receive_pipe_read(int receive_pipe_read_end, int *pipearray) {
+void read_from_receive_pipe(int receive_pipe_read_end, int *pipearray) {
 	char *buffer = new char[BUFSIZE];
 	char *write_buffer = new char[BUFSIZE];
 	bzero(buffer, BUFSIZE);
@@ -99,7 +99,7 @@ void receive_pipe_read(int receive_pipe_read_end, int *pipearray) {
 	receive_pipe_write(pipearray, temp_header->hlp, write_buffer);
 }
 
-char *append_header(int higher_protocol_id, int other_info, char *buffer, int bytes_read) {
+char *append_header_to_message(int higher_protocol_id, int other_info, char *buffer, int bytes_read) {
 	char *send_buffer = new char[BUFSIZE];
 	header *ethernet_header = new header;
 	bzero(ethernet_header, sizeof(header));
@@ -136,7 +136,7 @@ int get_protocol_other_info(int higher_protocol_id) {
 	return other_info;
 }
 
-void send_pipe(int send_pipe_write_end, int send_pipe_read_end) { 
+void read_from_and_write_to_send_pipe(int send_pipe_write_end, int send_pipe_read_end) { 
 	int bytes_read, higher_protocol_id, other_info;
 	char *read_buffer = new char[BUFSIZE];
 	char *read_buffer_minus_id = new char[BUFSIZE];
@@ -156,7 +156,7 @@ void send_pipe(int send_pipe_write_end, int send_pipe_read_end) {
 	}
 }
 
-int *create_protocol_pipes() {
+int *create_all_protocol_pipes() {
 	int i;
 	int j = 0;
 	int *pipearray = new int[NUM_PROTOCOL_PIPES_FDS];
@@ -203,7 +203,7 @@ int create_udp_socket(int socket_type) {
 	}
 }
 
-void socket_write(int port_number, int s, int ethernet_send_pipe_read_end) {
+void read_from_pipe_write_to_socket(int port_number, int s, int ethernet_send_pipe_read_end) {
 	char buffer[BUFSIZE];
 	//while(1) {
 		bzero(buffer, BUFSIZE);
@@ -223,7 +223,7 @@ void socket_write(int port_number, int s, int ethernet_send_pipe_read_end) {
 	//}
 }
 
-void socket_read(int s, int ethernet_receive_pipe_write_end) {
+void read_from_socket_write_to_pipe(int s, int ethernet_receive_pipe_write_end) {
 	char *buf = new char[BUFSIZE]; 
 	int recvfrom_error;
 	//while(1) {
