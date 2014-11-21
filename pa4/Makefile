@@ -8,14 +8,17 @@ all: process_per_protocol
 #process_per_message: process_per_message threadpool.o message.o
 #	$(CC) $(FLAGS) -o $@ $^ $(LIBS)
 
-process_per_protocol: process_per_protocol.cpp threadpool.h message.o
+process_per_protocol: process_per_protocol.o message.o
 	$(CC) $(FLAGS) -o $@ $^ $(LIBS)
+	
+process_per_protocol.o: process_per_protocol.cpp threadpool.h
+	$(CC) $(FLAGS) -c $^ 
 
 #threadpool.o: threadpool.cpp
 #	$(CC) $(FLAGS) -o $@ -c $^
 
 message.o: message.cpp
-	$(CC) $(FLAGS) -o $@ -c $^
+	$(CC) $(FLAGS) -c $^
 
 clean:
 	$(RM) message.o process_per_protocol 

@@ -49,24 +49,7 @@ struct header {
 	int message_len;
 };
 
-void receive_pipe_read(int receive_pipe_read_end, int *pipearray) {
-	char *buffer = new char[BUFSIZE];
-	char *write_buffer = new char[BUFSIZE];
-	bzero(buffer, BUFSIZE);
-	if(read(receive_pipe_read_end, buffer, BUFSIZE) == -1) {
-		fprintf(stderr, "error reading from ethernet receive pipe: %s\n", strerror(errno));
-	}
-	Message *m = new Message(buffer, BUFSIZE);
-	char *stripped_header = m->msgStripHdr(HEADER_LEN);
-	header *temp_header = new header;
-	memcpy(temp_header, stripped_header, sizeof(HEADER_LEN));
-	cout << "Temp_header->hlp: " << temp_header->hlp << endl;
-	m->msgFlat(write_buffer);
-	cout << "Message after strip: " << write_buffer << endl;
-	receive_pipe_write(pipearray, temp_header->hlp);
-}
-
-void receive_pipe_write(int *pipearray, int hlp) {
+void receive_pipe_write(int *pipearray, int hlp, char *write_buffer) {
 	switch (hlp) {
 		case 2: //write to IPs receive pipe
 			if(write(pipearray[5], write_buffer, BUFSIZE) == -1) {
@@ -96,6 +79,24 @@ void receive_pipe_write(int *pipearray, int hlp) {
 			if(write(pipearray[29], write_buffer, BUFSIZE) == -1) {
 				fprintf(stderr, "error writing to dns receive pipe: %s\n", strerror(errno));
 			}
+	}
+}
+
+void receive_pipe_read(int receive_pipe_read_end, int *pipearray) {
+	char *buffer = new char[BUFSIZE];
+	char *write_buffer = new char[BUFSIZE];
+	bzero(buffer, BUFSIZE);
+	if(read(receive_pipe_read_end, buffer, BUFSIZE) == -1) {
+		fprintf(stderr, "error reading from ethernet receive pipe: %s\n", strerror(errno));
+	}
+	Message *m = new Message(buffer, BUFSIZE);
+	char *stripped_header = m->msgStripHdr(HEADER_LEN);
+	header *temp_header = new header;
+	memcpy(temp_header, stripped_header, sizeof(HEADER_LEN));
+	cout << "Temp_header->hlp: " << temp_header->hlp << endl;
+	m->msgFlat(write_buffer);
+	cout << "Message after strip: " << write_buffer << endl;
+	receive_pipe_write(pipearray, temp_header->hlp, write_buffer);
 }
 
 char *append_header(int higher_protocol_id, int other_info, char *buffer, int bytes_read) {
@@ -114,8 +115,29 @@ char *append_header(int higher_protocol_id, int other_info, char *buffer, int by
 	return send_buffer;
 }
 
-void send_pipe(int send_pipe_write_end, int send_pipe_read_end, int other_info) { 
-	int bytes_read, higher_protocol_id;
+int get_protocol_other_info(int higher_protocol_id) {
+	int other_info;
+	switch (higher_protocol_id) {
+		case 2: //ip
+			other_info = 8;//ethernet header
+		case 3: //tcp
+			other_info = 12;//ip header
+		case 4: //udp
+			other_info = 12;//ip header
+		case 5: //ftp
+			other_info = 4;//tcp header
+		case 6: //telnet
+			other_info = 4;//tcp header
+		case 7: //RDP
+			other_info = 4;//udp header
+		case 8: //DNS
+			other_info = 4;//udp header
+	}
+	return other_info;
+}
+
+void send_pipe(int send_pipe_write_end, int send_pipe_read_end) { 
+	int bytes_read, higher_protocol_id, other_info;
 	char *read_buffer = new char[BUFSIZE];
 	char *read_buffer_minus_id = new char[BUFSIZE];
 	char *send_buffer;
@@ -126,6 +148,7 @@ void send_pipe(int send_pipe_write_end, int send_pipe_read_end, int other_info) 
 		exit(1);
 	}
 	higher_protocol_id =  (int)atol(&read_buffer[0]);
+	other_info = get_protocol_other_info(higher_protocol_id);
 	memcpy(read_buffer_minus_id, read_buffer + 1, BUFSIZE-1);
 	send_buffer = append_header(higher_protocol_id, other_info, read_buffer_minus_id, bytes_read-1);
 	if(write(send_pipe_write_end, send_buffer, BUFSIZE) == -1) {
@@ -160,8 +183,8 @@ int create_udp_socket(int socket_type) {
 	if((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
 		fprintf(stderr, "cannot creat UDP socket: %s\n", strerror(errno));
 	}
-	if(bind(s, (struct sockaddr *)&clientaddr, sizeof(clientaddr)) < 0) {
-		fprintf(stderr, "can't bind to port: %s\n", strerror(errno));
+	if(::bind(s, (struct sockaddr *)&clientaddr, sizeof(clientaddr)) < 0) {
+		fprintf(stderr, "can't  to port: %s\n", strerror(errno));
 		exit(1);
 	}
 	else {
