@@ -21,4 +21,4 @@ message.o: message.cpp
 	$(CC) $(FLAGS) -c $^
 
 clean:
-	$(RM) message.o process_per_protocol 
+	$(RM) message.o process_per_protocol.o process_per_protocol
