@@ -246,7 +246,7 @@ void read_from_socket_write_to_pipe(int s, int ethernet_receive_pipe_write_end) 
 	//}
 }
 
-void pipe_sendreceive_test() {
+void pipe_sendreceive_test(int *pipearray) {
 	/*
 	send_pipe(pipearray[5], pipearray[0], 12);
 	receive_pipe(pipearray[4], pipearray[3]);
@@ -260,7 +260,7 @@ void pipe_sendreceive_test() {
 	test_buffer[m->msgLen()] = '\0';
 	cout << test_buffer << endl;
 	*/
-	int *pipearray = create_all_protocol_pipes();
+	// int *pipearray = create_all_protocol_pipes();
 	write(pipearray[1], "3", 1);
 	write(pipearray[1], "hi!", 3);
 	read_from_and_write_to_send_pipe(pipearray[3], pipearray[0]);
@@ -301,9 +301,34 @@ void socket_readwrite_test() {
 	*/
 }
 
-int main() {
+int main(int argc, char *argv[]) {
 	//socket_readwrite_test();
-	pipe_sendreceive_test();
-	//int *pipearray = create_protocol_pipes();
+	//pipe_sendreceive_test();
+	int *pipearray = create_all_protocol_pipes();
+	int job;
+	if(argc < 2) {
+		fprintf(stderr, "usage: ./process_per_protocol <job>");
+		exit(1);
+	}
+	else {
+		job = (int)atol(argv[1]);
+	}
+
+	if(job == 1) {
+		char *buffer = new char[BUFSIZE];
+		int in_udp_socket;
+		in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
+		read_from_socket_write_to_pipe(in_udp_socket, pipearray[1]);
+		read(pipearray[0], buffer, BUFSIZE);
+		cout << buffer << endl;
+	}
+	else {
+		int serv_in_udp_port;
+		int out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
+		cout << "Enter the port number of the server in udp socket: ";
+		cin >> serv_in_udp_port;
+		write(pipearray[3], "hi!", 3);
+		read_from_pipe_write_to_socket(serv_in_udp_port, out_udp_socket, pipearray[2]);
+	}
 	return 0;
 }
