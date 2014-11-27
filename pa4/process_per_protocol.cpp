@@ -29,10 +29,10 @@ using namespace std;
 	2,3 (ethernet send pipe read, write)
 	4,5 (ip receive pipe read, write)
 	6,7 (ip send pipe read, write)
-	8,9 (upd receive pipe read, write)
-	10,11 (udp send pipe read, write)
-	12, 13 (tcp receive pipe read, write)
-	14, 15 (tcp send pipe read, write)
+	8,9 (udp/tcp receive pipe read, write)
+	10,11 (udp/tcp send pipe read, write)
+	12, 13
+	14, 15
 	16, 17 (ftp receive pipe read, write)
 	18, 19 (ftp send pipe read, write)
 	20, 21 (telnet receive pipe read, write)
@@ -120,7 +120,6 @@ char *append_header_to_message(int higher_protocol_id, int other_info, char *buf
 
 int get_protocol_other_info(int higher_protocol_id) {
 	int other_info;
-	cout << "higher_protocol_id: " << higher_protocol_id << endl;
 	switch (higher_protocol_id) {
 		case 2: //ip
 			other_info = 8;//ethernet header
@@ -179,6 +178,58 @@ void read_from_and_write_to_send_pipe(int send_pipe_write_end, int send_pipe_rea
 	}
 }
 
+void ip_receive_pipe(int *pipearray) {
+	char *buffer = new char[BUFSIZE];
+	char *write_buffer = new char[BUFSIZE];
+	while(1) {
+		bzero(buffer, BUFSIZE);
+		if(read(pipearray[4], buffer, BUFSIZE) == -1) {
+			fprintf(stderr, "error reading from ethernet receive pipe: %s\n", strerror(errno));
+		}
+		Message *m = new Message(buffer, BUFSIZE);
+		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
+		cout << "ip receive hlp: " << temp_header->hlp << endl;
+		cout << "ip receive oi: " << temp_header->other_info.size() << endl;
+		cout << "ip receive message_len: " << temp_header->message_len << endl;
+		m->msgFlat(write_buffer);
+		//write_to_receive_pipe(pipearray, temp_header->hlp, write_buffer);
+		if(temp_header->hlp == 3) {
+			if(write(pipearray[13], write_buffer, BUFSIZE) == -1) {
+				fprintf(stderr, "error writing to tcp receive pipe: %s\n", strerror(errno));
+			}
+		}
+		else if(temp_header->hlp == 4) {
+			if(write(pipearray[9], write_buffer, BUFSIZE) == -1) {
+				fprintf(stderr, "error writing to udp receive pipe: %s\n", strerror(errno));
+			}
+		}
+	}
+}
+
+void ip_send_pipe(int *pipearray) {
+	int bytes_read, higher_protocol_id;
+	char *read_buffer = new char[BUFSIZE];
+	char *read_buffer_minus_id = new char[BUFSIZE];
+	char *send_buffer;
+	while(1) {
+		bzero(read_buffer, BUFSIZE);
+		bzero(read_buffer_minus_id, BUFSIZE);
+		bytes_read = read(pipearray[10], read_buffer, BUFSIZE);
+		if(bytes_read == -1) {
+			fprintf(stderr, "error reading from ip send pipe: %s\n", strerror(errno));
+			exit(1);
+		}
+		higher_protocol_id =  (int)atol(&read_buffer[0]);
+		cout << "ip send protocol_id: " << higher_protocol_id << endl;
+		memcpy(read_buffer_minus_id, read_buffer + 1, BUFSIZE-1);
+		cout << "ip send message: " << read_buffer << endl;
+		send_buffer = append_header_to_message(higher_protocol_id, 12, read_buffer_minus_id, bytes_read-1);
+		if(write(pipearray[7], send_buffer, (bytes_read + HEADER_LEN - 1)) == -1) {
+			fprintf(stderr, "error writing to ethernet send pipe: %s\n", strerror(errno));
+		}
+	}
+}
+
 void ethernet_send_pipe(int *pipearray) {
 	int bytes_read;
 	char *read_buffer = new char[BUFSIZE];
@@ -190,9 +241,8 @@ void ethernet_send_pipe(int *pipearray) {
 			fprintf(stderr, "error reading from ip send pipe: %s\n", strerror(errno));
 			exit(1);
 		}
-		cout << "send buffer: " << read_buffer << endl;
 		send_buffer = append_header_to_message(2, 8, read_buffer, bytes_read);
-		if(write(pipearray[3], send_buffer, BUFSIZE) == -1) {
+		if(write(pipearray[3], send_buffer, (bytes_read + HEADER_LEN)) == -1) {
 			fprintf(stderr, "error writing to ethernet send pipe: %s\n", strerror(errno));
 		}
 	}
@@ -203,17 +253,18 @@ void ethernet_receive_pipe(int *pipearray) {
 	char *write_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(buffer, BUFSIZE);
+		bzero(write_buffer, BUFSIZE);
 		if(read(pipearray[0], buffer, BUFSIZE) == -1) {
 			fprintf(stderr, "error reading from ethernet receive pipe: %s\n", strerror(errno));
 		}
 		Message *m = new Message(buffer, BUFSIZE);
 		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
-		cout << "hlp: " << temp_header->hlp << endl;
-		cout << "oi: " << temp_header->other_info.size() << endl;
-		cout << "message_len: " << temp_header->message_len << endl;
+		cout << "ethernet receive hlp: " << temp_header->hlp << endl;
+		cout << "ethernet receive oi: " << temp_header->other_info.size() << endl;
+		cout << "ethernet receive message_len: " << temp_header->message_len << endl;
 		m->msgFlat(write_buffer);
-		cout << "receive buffer: " << write_buffer << endl;
-		if(write(pipearray[5], write_buffer, BUFSIZE) == -1) {
+		cout << "ethernet receive buffer: " << write_buffer << endl;
+		if(write(pipearray[5], write_buffer, temp_header->message_len) == -1) {
 			fprintf(stderr, "error writing to ip receive pipe: %s\n", strerror(errno));
 		}
 	}
@@ -317,9 +368,7 @@ int main(int argc, char *argv[]) {
 		int serv_in_udp_port, out_udp_socket, in_udp_socket, continue_;
 		char *message = new char[BUFSIZE];
 		char *received_message = new char[BUFSIZE];
-		char *buffer;
-		strncpy(message, "hi!", 3);
-		//buffer = append_header_to_message(2, 8, message, 3);
+		memcpy(message, "4bye!", 5);
 		out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
 		in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
 		cout << "Enter the port number of the server in udp socket: ";
@@ -328,22 +377,24 @@ int main(int argc, char *argv[]) {
 		thread socket_send (read_from_pipe_write_to_socket, serv_in_udp_port, out_udp_socket, pipearray[2]);
 		thread ethernet_receive (ethernet_receive_pipe, pipearray);
 		thread ethernet_send (ethernet_send_pipe, pipearray);
-		write(pipearray[7], message, 3);
+		thread ip_send (ip_send_pipe, pipearray);
+		thread ip_receive (ip_receive_pipe, pipearray);
+		write(pipearray[11], message, 5);
 		cin >> continue_;
-		read(pipearray[4], received_message, BUFSIZE);
+		read(pipearray[8], received_message, BUFSIZE);
 		cout << "message: " << received_message << endl;
 		socket_receive.join();
 		socket_send.join();
 		ethernet_receive.join();
 		ethernet_send.join();
+		ip_send.join();
+		ip_receive.join();
 	}
 	else {
 		int serv_in_udp_port, out_udp_socket, in_udp_socket, continue_;
 		char *message = new char[BUFSIZE];
 		char *received_message = new char[BUFSIZE];
-		char *buffer;
-		strncpy(message, "bye!", 4);
-		//buffer = append_header_to_message(2, 8, message, 4);
+		memcpy(message, "4hi!", 4);
 		out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
 		in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
 		cout << "Enter the port number of the server in udp socket: ";
@@ -352,14 +403,18 @@ int main(int argc, char *argv[]) {
 		thread socket_send (read_from_pipe_write_to_socket, serv_in_udp_port, out_udp_socket, pipearray[2]);
 		thread ethernet_receive (ethernet_receive_pipe, pipearray);
 		thread ethernet_send (ethernet_send_pipe, pipearray);
-		write(pipearray[7], message, 4);
+		thread ip_send (ip_send_pipe, pipearray);
+		thread ip_receive (ip_receive_pipe, pipearray);
+		write(pipearray[11], message, 4);
 		cin >> continue_;
-		read(pipearray[4], received_message, BUFSIZE);
+		read(pipearray[8], received_message, BUFSIZE);
 		cout << "message: " << received_message << endl;
 		socket_receive.join();
 		socket_send.join();
 		ethernet_receive.join();
 		ethernet_send.join();
+		ip_send.join();
+		ip_receive.join();
 	}
 	return 0;
 }
