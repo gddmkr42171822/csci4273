@@ -13,16 +13,24 @@
 #include "threadpool.h"
 #include "message.h"
 #include <semaphore.h>
+#include <mutex>
+#include <condition_variable>
 
 #define BUFSIZE 4096
 #define DEFAULT_NUM_THREADS 30
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
 #define HEADER_LEN 40
-#define NUM_PROTOCOL_PIPES 17
-#define NUM_PROTOCOL_PIPES_FDS 34
+#define NUM_PROTOCOL_PIPES 18
+#define NUM_PROTOCOL_PIPES_FDS 36
+#define NUM_MESSAGES 1
 using namespace std;
 
+sem_t dns_rdp_send_sem;
+sem_t udp_tcp_send_sem;
+sem_t ip_send_sem;
+//mutex dns_send_mutex;
+//condition_variable dns_send_cv;
 
 /* Pipearray designations:
 	0, 1 (ethernet recieve pipe read,write)
@@ -42,6 +50,7 @@ using namespace std;
 	28, 29 (application_message_telnet send pipe read, write)
 	30, 31 (application_message_rdp send pipe read, write)
 	32, 33 (application_message_dns send pipe read, write)
+	34, 35 (socket send pipe read, write)
 */
 
 struct header {
@@ -65,7 +74,7 @@ char *append_header_to_message(int higher_protocol_id, int other_info, char *buf
 void application_to_dns(int *pipearray) {
 	char *message = new char[BUFSIZE];
 	memcpy(message, "This is DNS!", 12);
-	for(int i = 0;i < 100;i++) {
+	for(int i = 0;i < NUM_MESSAGES;i++) {
 		write(pipearray[33], message, 12);
 	}
 	usleep(5000);// 5 milliseconds
@@ -74,7 +83,7 @@ void application_to_dns(int *pipearray) {
 void application_to_rdp(int *pipearray) {
 	char *message = new char[BUFSIZE];
 	memcpy(message, "This is RDP!", 12);
-	for(int i = 0;i < 100;i++) {
+	for(int i = 0;i < NUM_MESSAGES;i++) {
 		write(pipearray[31], message, 12);
 	}
 	usleep(5000);// 5 milliseconds
@@ -83,7 +92,7 @@ void application_to_rdp(int *pipearray) {
 void application_to_telnet(int *pipearray) {
 	char *message = new char[BUFSIZE];
 	memcpy(message, "This is telnet!", 15);
-	for(int i = 0;i < 100;i++) {
+	for(int i = 0;i < NUM_MESSAGES;i++) {
 		write(pipearray[29], message, 15);
 	}
 	usleep(5000);// 5 milliseconds
@@ -92,7 +101,7 @@ void application_to_telnet(int *pipearray) {
 void application_to_ftp(int *pipearray) {
 	char *message = new char[BUFSIZE];
 	memcpy(message, "This is ftp!", 12);
-	for(int i = 0;i < 100;i++) {
+	for(int i = 0;i < NUM_MESSAGES;i++) {
 		write(pipearray[27], message, 12);
 	}
 	usleep(5000);// 5 milliseconds
@@ -101,7 +110,8 @@ void application_to_ftp(int *pipearray) {
 void dns_send_pipe(int *pipearray) {
 	int bytes_read;
 	char *read_buffer = new char[BUFSIZE];
-	char *send_buffer;
+	char *temp_buffer;
+	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
 		bytes_read = read(pipearray[32], read_buffer, BUFSIZE);
@@ -110,10 +120,14 @@ void dns_send_pipe(int *pipearray) {
 			exit(1);
 		}
 		cout << "dns send message: " << read_buffer << endl;
-		send_buffer = append_header_to_message(0, 8, read_buffer, bytes_read);
-		if(write(pipearray[25], send_buffer, (bytes_read + HEADER_LEN)) == -1) {
-			fprintf(stderr, "error writing to udp send pipe: %s\n", strerror(errno));
+		temp_buffer = append_header_to_message(0, 8, read_buffer, bytes_read);
+		memcpy(send_buffer, "8", 1);
+		memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read));
+		sem_wait(&dns_rdp_send_sem);
+		if(write(pipearray[25], send_buffer, (bytes_read + HEADER_LEN + 1)) == -1) {
+			fprintf(stderr, "error writing to rdp/dns send pipe: %s\n", strerror(errno));
 		}
+		sem_post(&dns_rdp_send_sem);
 	}
 }
 
@@ -122,8 +136,8 @@ void dns_receive_pipe(int *pipearray) {
 	char *write_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(buffer, BUFSIZE);
-		if(read(pipearray[20], buffer, BUFSIZE) == -1) {
-			fprintf(stderr, "error reading from udp receive pipe: %s\n", strerror(errno));
+		if(read(pipearray[22], buffer, BUFSIZE) == -1) {
+			fprintf(stderr, "error reading from dns receive pipe: %s\n", strerror(errno));
 		}
 		Message *m = new Message(buffer, BUFSIZE);
 		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
@@ -138,7 +152,8 @@ void dns_receive_pipe(int *pipearray) {
 void rdp_send_pipe(int *pipearray) {
 	int bytes_read;
 	char *read_buffer = new char[BUFSIZE];
-	char *send_buffer;
+	char *temp_buffer;
+	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
 		bytes_read = read(pipearray[30], read_buffer, BUFSIZE);
@@ -147,9 +162,12 @@ void rdp_send_pipe(int *pipearray) {
 			exit(1);
 		}
 		cout << "rdp send message: " << read_buffer << endl;
-		send_buffer = append_header_to_message(0, 12, read_buffer, bytes_read);
-		if(write(pipearray[25], send_buffer, (bytes_read + HEADER_LEN)) == -1) {
-			fprintf(stderr, "error writing to udp send pipe: %s\n", strerror(errno));
+		temp_buffer = append_header_to_message(0, 12, read_buffer, bytes_read);
+		memcpy(send_buffer, "7", 1);
+		memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read));
+		sem_wait(&dns_rdp_send_sem);
+		if(write(pipearray[25], send_buffer, (bytes_read + HEADER_LEN + 1)) == -1) {
+			fprintf(stderr, "error writing to rdp/dns send pipe: %s\n", strerror(errno));
 		}
 	}
 }
@@ -160,7 +178,7 @@ void rdp_receive_pipe(int *pipearray) {
 	while(1) {
 		bzero(buffer, BUFSIZE);
 		if(read(pipearray[20], buffer, BUFSIZE) == -1) {
-			fprintf(stderr, "error reading from udp receive pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from rdp receive pipe: %s\n", strerror(errno));
 		}
 		Message *m = new Message(buffer, BUFSIZE);
 		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
@@ -180,13 +198,13 @@ void telnet_send_pipe(int *pipearray) {
 		bzero(read_buffer, BUFSIZE);
 		bytes_read = read(pipearray[28], read_buffer, BUFSIZE);
 		if(bytes_read == -1) {
-			fprintf(stderr, "error reading from ip send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from application telnet send pipe: %s\n", strerror(errno));
 			exit(1);
 		}
 		cout << "telnet send message: " << read_buffer << endl;
 		send_buffer = append_header_to_message(0, 8, read_buffer, bytes_read);
 		if(write(pipearray[19], send_buffer, (bytes_read + HEADER_LEN)) == -1) {
-			fprintf(stderr, "error writing to tcp send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error writing to ftp/telnet send pipe: %s\n", strerror(errno));
 		}
 	}
 }
@@ -197,7 +215,7 @@ void telnet_receive_pipe(int *pipearray) {
 	while(1) {
 		bzero(buffer, BUFSIZE);
 		if(read(pipearray[16], buffer, BUFSIZE) == -1) {
-			fprintf(stderr, "error reading from tcp receive pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from telnet receive pipe: %s\n", strerror(errno));
 		}
 		Message *m = new Message(buffer, BUFSIZE);
 		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
@@ -217,13 +235,13 @@ void ftp_send_pipe(int *pipearray) {
 		bzero(read_buffer, BUFSIZE);
 		bytes_read = read(pipearray[26], read_buffer, BUFSIZE);
 		if(bytes_read == -1) {
-			fprintf(stderr, "error reading from ip send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from application ftp send pipe: %s\n", strerror(errno));
 			exit(1);
 		}
 		cout << "ftp send message: " << read_buffer << endl;
 		send_buffer = append_header_to_message(0, 8, read_buffer, bytes_read);
 		if(write(pipearray[19], send_buffer, (bytes_read + HEADER_LEN)) == -1) {
-			fprintf(stderr, "error writing to ethernet send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error writing to ftp/telnet send pipe: %s\n", strerror(errno));
 		}
 	}
 }
@@ -234,7 +252,7 @@ void ftp_receive_pipe(int *pipearray) {
 	while(1) {
 		bzero(buffer, BUFSIZE);
 		if(read(pipearray[14], buffer, BUFSIZE) == -1) {
-			fprintf(stderr, "error reading from tcp receive pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from ftp receive pipe: %s\n", strerror(errno));
 		}
 		Message *m = new Message(buffer, BUFSIZE);
 		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
@@ -250,23 +268,28 @@ void udp_send_pipe(int *pipearray) {
 	int bytes_read, higher_protocol_id;
 	char *read_buffer = new char[BUFSIZE];
 	char *read_buffer_minus_id = new char[BUFSIZE];
-	char *send_buffer;
+	char *temp_buffer;
+	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
 		bzero(read_buffer_minus_id, BUFSIZE);
 		bytes_read = read(pipearray[24], read_buffer, BUFSIZE);
 		if(bytes_read == -1) {
-			fprintf(stderr, "error reading from ip send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from rdp/dns send pipe: %s\n", strerror(errno));
 			exit(1);
 		}
 		higher_protocol_id =  (int)atol(&read_buffer[0]);
-		cout << "ip send protocol_id: " << higher_protocol_id << endl;
+		cout << "udp send protocol_id: " << higher_protocol_id << endl;
+		cout << "udp bytes read: " << bytes_read << endl;
 		memcpy(read_buffer_minus_id, read_buffer + 1, BUFSIZE-1);
-		cout << "ip send message: " << read_buffer << endl;
-		send_buffer = append_header_to_message(higher_protocol_id, 12, read_buffer_minus_id, bytes_read-1);
-		if(write(pipearray[7], send_buffer, (bytes_read + HEADER_LEN - 1)) == -1) {
-			fprintf(stderr, "error writing to ethernet send pipe: %s\n", strerror(errno));
+		temp_buffer = append_header_to_message(higher_protocol_id, 12, read_buffer_minus_id, bytes_read-1);
+		memcpy(send_buffer, "4", 1);
+		memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read - 1));
+		sem_wait(&udp_tcp_send_sem);
+		if(write(pipearray[13], send_buffer, (bytes_read + HEADER_LEN)) == -1) {
+			fprintf(stderr, "error writing to udp/tcp send pipe: %s\n", strerror(errno));
 		}
+		sem_post(&udp_tcp_send_sem);
 	}
 }
 
@@ -276,13 +299,13 @@ void udp_receive_pipe(int *pipearray) {
 	while(1) {
 		bzero(buffer, BUFSIZE);
 		if(read(pipearray[8], buffer, BUFSIZE) == -1) {
-			fprintf(stderr, "error reading from tcp receive pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from udp receive pipe: %s\n", strerror(errno));
 		}
 		Message *m = new Message(buffer, BUFSIZE);
 		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
-		cout << "tcp receive hlp: " << temp_header->hlp << endl;
-		cout << "tcp receive oi: " << temp_header->other_info.size() << endl;
-		cout << "tcp receive message_len: " << temp_header->message_len << endl;
+		cout << "udp receive hlp: " << temp_header->hlp << endl;
+		cout << "udp receive oi: " << temp_header->other_info.size() << endl;
+		cout << "udp receive message_len: " << temp_header->message_len << endl;
 		m->msgFlat(write_buffer);
 		if(temp_header->hlp == 7) {
 			if(write(pipearray[21], write_buffer, BUFSIZE) == -1) {
@@ -301,23 +324,27 @@ void tcp_send_pipe(int *pipearray) {
 	int bytes_read, higher_protocol_id;
 	char *read_buffer = new char[BUFSIZE];
 	char *read_buffer_minus_id = new char[BUFSIZE];
-	char *send_buffer;
+	char *temp_buffer;
+	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
 		bzero(read_buffer_minus_id, BUFSIZE);
 		bytes_read = read(pipearray[18], read_buffer, BUFSIZE);
 		if(bytes_read == -1) {
-			fprintf(stderr, "error reading from ip send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from telnet/ftp send pipe: %s\n", strerror(errno));
 			exit(1);
 		}
 		higher_protocol_id =  (int)atol(&read_buffer[0]);
-		cout << "ip send protocol_id: " << higher_protocol_id << endl;
+		cout << "tcp send protocol_id: " << higher_protocol_id << endl;
 		memcpy(read_buffer_minus_id, read_buffer + 1, BUFSIZE-1);
-		cout << "ip send message: " << read_buffer << endl;
-		send_buffer = append_header_to_message(higher_protocol_id, 12, read_buffer_minus_id, bytes_read-1);
-		if(write(pipearray[7], send_buffer, (bytes_read + HEADER_LEN - 1)) == -1) {
-			fprintf(stderr, "error writing to ethernet send pipe: %s\n", strerror(errno));
+		temp_buffer = append_header_to_message(higher_protocol_id, 12, read_buffer_minus_id, bytes_read-1);
+		memcpy(send_buffer, "3", 1);
+		memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read-1));
+		sem_wait(&udp_tcp_send_sem);
+		if(write(pipearray[13], send_buffer, (bytes_read + HEADER_LEN )) == -1) {
+			fprintf(stderr, "error writing to udp/tcp send pipe: %s\n", strerror(errno));
 		}
+		sem_wait(&ip_send_sem);
 	}
 }
 
@@ -354,7 +381,7 @@ void ip_receive_pipe(int *pipearray) {
 	while(1) {
 		bzero(buffer, BUFSIZE);
 		if(read(pipearray[4], buffer, BUFSIZE) == -1) {
-			fprintf(stderr, "error reading from ethernet receive pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from ip receive pipe: %s\n", strerror(errno));
 		}
 		Message *m = new Message(buffer, BUFSIZE);
 		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
@@ -363,7 +390,7 @@ void ip_receive_pipe(int *pipearray) {
 		cout << "ip receive message_len: " << temp_header->message_len << endl;
 		m->msgFlat(write_buffer);
 		if(temp_header->hlp == 3) {
-			if(write(pipearray[13], write_buffer, BUFSIZE) == -1) {
+			if(write(pipearray[11], write_buffer, BUFSIZE) == -1) {
 				fprintf(stderr, "error writing to tcp receive pipe: %s\n", strerror(errno));
 			}
 		}
@@ -407,12 +434,12 @@ void ethernet_send_pipe(int *pipearray) {
 		bzero(read_buffer, BUFSIZE);
 		bytes_read = read(pipearray[6], read_buffer, BUFSIZE);
 		if(bytes_read == -1) {
-			fprintf(stderr, "error reading from ip send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from ethernet send pipe: %s\n", strerror(errno));
 			exit(1);
 		}
 		send_buffer = append_header_to_message(2, 8, read_buffer, bytes_read);
 		if(write(pipearray[3], send_buffer, (bytes_read + HEADER_LEN)) == -1) {
-			fprintf(stderr, "error writing to ethernet send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error writing to socket send pipe: %s\n", strerror(errno));
 		}
 	}
 }
@@ -432,7 +459,6 @@ void ethernet_receive_pipe(int *pipearray) {
 		cout << "ethernet receive oi: " << temp_header->other_info.size() << endl;
 		cout << "ethernet receive message_len: " << temp_header->message_len << endl;
 		m->msgFlat(write_buffer);
-		cout << "ethernet receive buffer: " << write_buffer << endl;
 		if(write(pipearray[5], write_buffer, temp_header->message_len) == -1) {
 			fprintf(stderr, "error writing to ip receive pipe: %s\n", strerror(errno));
 		}
@@ -487,7 +513,7 @@ int create_udp_socket(int socket_type) {
 	}
 }
 
-void read_from_pipe_write_to_socket(int port_number, int s, int ethernet_send_pipe_read_end) {
+void socket_send(int port_number, int s, int ethernet_send_pipe_read_end) {
 	char buffer[BUFSIZE];
 	while(1) {
 		bzero(buffer, BUFSIZE);
@@ -507,7 +533,7 @@ void read_from_pipe_write_to_socket(int port_number, int s, int ethernet_send_pi
 	}
 }
 
-void read_from_socket_write_to_pipe(int s, int ethernet_receive_pipe_write_end) {
+void socket_receive(int s, int ethernet_receive_pipe_write_end) {
 	char *buf = new char[BUFSIZE];
 	int recvfrom_error;
 	while(1) {
@@ -522,8 +548,60 @@ void read_from_socket_write_to_pipe(int s, int ethernet_receive_pipe_write_end) 
 	}
 }
 
+void initialize_sems() {
+	sem_init(&dns_rdp_send_sem, 0, 1);
+	sem_init(&udp_tcp_send_sem, 0, 1);
+	sem_init(&ip_send_sem, 0, 1);
+}
+
+void destroy_sems() {
+	sem_destroy(&dns_rdp_send_sem);
+	sem_destroy(&udp_tcp_send_sem);
+	sem_destroy(&ip_send_sem);
+}
+/*
+void dispatch_threads(int *pipearray) {
+	thread ethernet_receive (ethernet_receive_pipe, pipearray);
+	thread ethernet_send (ethernet_send_pipe, pipearray);
+	thread ip_send (ip_send_pipe, pipearray);
+	thread ip_receive (ip_receive_pipe, pipearray);
+	thread tcp_send (tcp_send_pipe, pipearray);
+	thread tcp_receive (tcp_receive_pipe, pipearray);
+	thread udp_send (udp_send_pipe, pipearray);
+	thread udp_receive (udp_receive_pipe, pipearray);
+	thread ftp_send (ftp_send_pipe, pipearray);
+	thread ftp_receive (ftp_receive_pipe, pipearray);
+	thread telnet_send (telnet_send_pipe, pipearray);
+	thread telnet_receive (telnet_receive_pipe, pipearray);
+	thread rdp_send (rdp_send_pipe, pipearray);
+	thread rdp_receive (rdp_receive_pipe, pipearray);
+	thread dns_send (dns_send_pipe, pipearray);
+	thread dns_receive (dns_receive_pipe, pipearray);
+}
+*/
+/*
+void join_threads() {
+	ethernet_receive.join();
+	ethernet_send.join();
+	ip_send.join();
+	ip_receive.join();
+	tcp_send.join();
+	tcp_receive.join();
+	udp_send.join();
+	udp_receive.join();
+	ftp_send.join();
+	ftp_receive.join();
+	telnet_send.join();
+	telnet_receive.join();
+	rdp_send.join();
+	rdp_receive.join();
+	dns_send.join();
+	dns_receive.join();
+}
+*/
 int main(int argc, char *argv[]) {
 	int *pipearray = create_all_protocol_pipes();
+	initialize_sems();
 	int job;
 	if(argc < 2) {
 		fprintf(stderr, "usage: ./process_per_protocol <job>");
@@ -535,55 +613,116 @@ int main(int argc, char *argv[]) {
 
 	if(job == 1) {
 		int serv_in_udp_port, out_udp_socket, in_udp_socket, continue_;
-		char *message = new char[BUFSIZE];
-		char *received_message = new char[BUFSIZE];
-		memcpy(message, "4bye!", 5);
+		//char *message = new char[BUFSIZE];
+		//char *received_message = new char[BUFSIZE];
+		//memcpy(message, "4bye!", 5);
 		out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
 		in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
 		cout << "Enter the port number of the server in udp socket: ";
 		cin >> serv_in_udp_port;
-		thread socket_receive (read_from_socket_write_to_pipe, in_udp_socket, pipearray[1]);
-		thread socket_send (read_from_pipe_write_to_socket, serv_in_udp_port, out_udp_socket, pipearray[2]);
+		thread socket_r (socket_receive, in_udp_socket, pipearray[1]);
+		thread socket_s (socket_send, serv_in_udp_port, out_udp_socket, pipearray[2]);
 		thread ethernet_receive (ethernet_receive_pipe, pipearray);
 		thread ethernet_send (ethernet_send_pipe, pipearray);
 		thread ip_send (ip_send_pipe, pipearray);
 		thread ip_receive (ip_receive_pipe, pipearray);
-		write(pipearray[11], message, 5);
+		thread tcp_send (tcp_send_pipe, pipearray);
+		thread tcp_receive (tcp_receive_pipe, pipearray);
+		thread udp_send (udp_send_pipe, pipearray);
+		thread udp_receive (udp_receive_pipe, pipearray);
+		thread ftp_send (ftp_send_pipe, pipearray);
+		thread ftp_receive (ftp_receive_pipe, pipearray);
+		thread telnet_send (telnet_send_pipe, pipearray);
+		thread telnet_receive (telnet_receive_pipe, pipearray);
+		thread rdp_send (rdp_send_pipe, pipearray);
+		thread rdp_receive (rdp_receive_pipe, pipearray);
+		thread dns_send (dns_send_pipe, pipearray);
+		thread dns_receive (dns_receive_pipe, pipearray);
+		//dispatch_threads(pipearray);
+		//write(pipearray[11], message, 5);
+		cout << "Write message? ";
 		cin >> continue_;
-		read(pipearray[8], received_message, BUFSIZE);
-		cout << "message: " << received_message << endl;
-		socket_receive.join();
-		socket_send.join();
+		application_to_dns(pipearray);
+		//read(pipearray[8], received_message, BUFSIZE);
+		//cout << "message: " << received_message << endl;
+		cout << "End program? ";
+		cin >> continue_;
+		socket_r.join();
+		socket_s.join();
 		ethernet_receive.join();
 		ethernet_send.join();
 		ip_send.join();
 		ip_receive.join();
+		tcp_send.join();
+		tcp_receive.join();
+		udp_send.join();
+		udp_receive.join();
+		ftp_send.join();
+		ftp_receive.join();
+		telnet_send.join();
+		telnet_receive.join();
+		rdp_send.join();
+		rdp_receive.join();
+		dns_send.join();
+		dns_receive.join();
+		destroy_sems();
+		//join_threads();
 	}
 	else {
 		int serv_in_udp_port, out_udp_socket, in_udp_socket, continue_;
-		char *message = new char[BUFSIZE];
-		char *received_message = new char[BUFSIZE];
-		memcpy(message, "4hi!", 4);
+		//char *message = new char[BUFSIZE];
+		//char *received_message = new char[BUFSIZE];
+		//memcpy(message, "4bye!", 5);
 		out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
 		in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
 		cout << "Enter the port number of the server in udp socket: ";
 		cin >> serv_in_udp_port;
-		thread socket_receive (read_from_socket_write_to_pipe, in_udp_socket, pipearray[1]);
-		thread socket_send (read_from_pipe_write_to_socket, serv_in_udp_port, out_udp_socket, pipearray[2]);
+		thread socket_r (socket_receive, in_udp_socket, pipearray[1]);
+		thread socket_s (socket_send, serv_in_udp_port, out_udp_socket, pipearray[2]);
 		thread ethernet_receive (ethernet_receive_pipe, pipearray);
 		thread ethernet_send (ethernet_send_pipe, pipearray);
 		thread ip_send (ip_send_pipe, pipearray);
 		thread ip_receive (ip_receive_pipe, pipearray);
-		write(pipearray[11], message, 4);
+		thread tcp_send (tcp_send_pipe, pipearray);
+		thread tcp_receive (tcp_receive_pipe, pipearray);
+		thread udp_send (udp_send_pipe, pipearray);
+		thread udp_receive (udp_receive_pipe, pipearray);
+		thread ftp_send (ftp_send_pipe, pipearray);
+		thread ftp_receive (ftp_receive_pipe, pipearray);
+		thread telnet_send (telnet_send_pipe, pipearray);
+		thread telnet_receive (telnet_receive_pipe, pipearray);
+		thread rdp_send (rdp_send_pipe, pipearray);
+		thread rdp_receive (rdp_receive_pipe, pipearray);
+		thread dns_send (dns_send_pipe, pipearray);
+		thread dns_receive (dns_receive_pipe, pipearray);
+		//dispatch_threads(pipearray);
+		//write(pipearray[11], message, 5);
+		//cout << "Write message? ";
+		//cin >> continue_;
+		//application_to_dns(pipearray);
+		//read(pipearray[8], received_message, BUFSIZE);
+		//cout << "message: " << received_message << endl;
+		cout << "End program? ";
 		cin >> continue_;
-		read(pipearray[8], received_message, BUFSIZE);
-		cout << "message: " << received_message << endl;
-		socket_receive.join();
-		socket_send.join();
+		socket_r.join();
+		socket_s.join();
 		ethernet_receive.join();
 		ethernet_send.join();
 		ip_send.join();
 		ip_receive.join();
+		tcp_send.join();
+		tcp_receive.join();
+		udp_send.join();
+		udp_receive.join();
+		ftp_send.join();
+		ftp_receive.join();
+		telnet_send.join();
+		telnet_receive.join();
+		rdp_send.join();
+		rdp_receive.join();
+		dns_send.join();
+		dns_receive.join();
+		//join_threads();
 	}
 	return 0;
 }
