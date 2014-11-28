@@ -23,14 +23,20 @@
 #define HEADER_LEN 40
 #define NUM_PROTOCOL_PIPES 18
 #define NUM_PROTOCOL_PIPES_FDS 36
-#define NUM_MESSAGES 3
+#define NUM_MESSAGES 5
 using namespace std;
 
 sem_t dns_rdp_send_sem;
 sem_t udp_tcp_send_sem;
 sem_t telnet_ftp_send_sem;
-//mutex dns_send_mutex;
-//condition_variable dns_send_cv;
+mutex application_dns_mutex;
+condition_variable application_dns_cv;
+mutex application_rdp_mutex;
+condition_variable application_rdp_cv;
+mutex application_ftp_mutex;
+condition_variable application_ftp_cv;
+mutex application_telnet_mutex;
+condition_variable application_telnet_cv;
 
 /* Pipearray designations:
 	0, 1 (ethernet recieve pipe read,write)
@@ -73,22 +79,24 @@ char *append_header_to_message(int higher_protocol_id, int other_info, char *buf
 
 void application_to_dns(int *pipearray) {
 	char *message = new char[BUFSIZE];
-	//memcpy(message, "This is DNS!", 12);
 	memcpy(message, "1", 1);
 	for(int i = 0;i < NUM_MESSAGES;i++) {
-		//write(pipearray[33], message, 12);
+		application_dns_mutex.lock();
 		write(pipearray[33], message, 1);
+		application_dns_mutex.unlock();
+		application_dns_cv.notify_one();
 		usleep(5000);// 5 milliseconds
 	}
 }
 
 void application_to_rdp(int *pipearray) {
 	char *message = new char[BUFSIZE];
-	//memcpy(message, "This is RDP!", 12);
 	memcpy(message, "2", 1);
 	for(int i = 0;i < NUM_MESSAGES;i++) {
-		//write(pipearray[31], message, 12);
+		application_rdp_mutex.lock();
 		write(pipearray[31], message, 1);
+		application_rdp_mutex.unlock();
+		application_rdp_cv.notify_one();
 		usleep(5000);// 5 milliseconds
 	}
 
@@ -96,11 +104,12 @@ void application_to_rdp(int *pipearray) {
 
 void application_to_telnet(int *pipearray) {
 	char *message = new char[BUFSIZE];
-	//memcpy(message, "This is telnet!", 15);
 	memcpy(message, "3", 1);
 	for(int i = 0;i < NUM_MESSAGES;i++) {
-		//write(pipearray[29], message, 15);
+		application_telnet_mutex.lock();
 		write(pipearray[29], message, 1);
+		application_telnet_mutex.unlock();
+		application_telnet_cv.notify_one();
 		usleep(5000);// 5 milliseconds
 	}
 
@@ -108,11 +117,12 @@ void application_to_telnet(int *pipearray) {
 
 void application_to_ftp(int *pipearray) {
 	char *message = new char[BUFSIZE];
-	//memcpy(message, "This is ftp!", 12);
 	memcpy(message, "4", 1);
 	for(int i = 0;i < NUM_MESSAGES;i++) {
-		//write(pipearray[27], message, 12);
+		application_ftp_mutex.lock();
 		write(pipearray[27], message, 1);
+		application_ftp_mutex.unlock();
+		application_ftp_cv.notify_one();
 		usleep(5000);// 5 milliseconds
 	}
 }
@@ -124,7 +134,11 @@ void dns_send_pipe(int *pipearray) {
 	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
+		unique_lock<mutex> lk(application_dns_mutex);
+		application_dns_cv.wait(lk);
 		bytes_read = read(pipearray[32], read_buffer, BUFSIZE);
+		lk.unlock();
+		application_dns_mutex.unlock();
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from application_dns send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -168,7 +182,10 @@ void rdp_send_pipe(int *pipearray) {
 	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
+		unique_lock<mutex> lk(application_rdp_mutex);
+		application_rdp_cv.wait(lk);
 		bytes_read = read(pipearray[30], read_buffer, BUFSIZE);
+		lk.unlock();
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from application_rdp send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -212,7 +229,10 @@ void telnet_send_pipe(int *pipearray) {
 	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
+		unique_lock<mutex> lk(application_telnet_mutex);
+		application_telnet_cv.wait(lk);
 		bytes_read = read(pipearray[28], read_buffer, BUFSIZE);
+		lk.unlock();
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from application telnet send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -256,7 +276,10 @@ void ftp_send_pipe(int *pipearray) {
 	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
+		unique_lock<mutex> lk(application_ftp_mutex);
+		application_ftp_cv.wait(lk);
 		bytes_read = read(pipearray[26], read_buffer, BUFSIZE);
+		lk.unlock();
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from application ftp send pipe: %s\n", strerror(errno));
 			exit(1);
