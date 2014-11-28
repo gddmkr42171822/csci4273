@@ -23,9 +23,14 @@
 #define HEADER_LEN 40
 #define NUM_PROTOCOL_PIPES 18
 #define NUM_PROTOCOL_PIPES_FDS 36
-#define NUM_MESSAGES 2
+#define NUM_MESSAGES 5
 using namespace std;
 
+
+sem_t ftp_send_sem;
+sem_t telnet_send_sem;
+sem_t application_telnet_sem;
+sem_t application_ftp_sem;
 mutex application_dns_mutex;
 condition_variable application_dns_cv;
 mutex application_rdp_mutex;
@@ -42,8 +47,10 @@ mutex ip_send_mutex;
 condition_variable ip_send_cv;
 mutex ethernet_send_mutex;
 condition_variable ethernet_send_cv;
-mutex ftp_telnet_send_mutex;
-condition_variable ftp_telnet_send_cv;
+mutex telnet_send_mutex;
+condition_variable telnet_send_cv;
+mutex ftp_send_mutex;
+condition_variable ftp_send_cv;
 
 /* Pipearray designations:
 	0, 1 (ethernet recieve pipe read,write)
@@ -52,9 +59,11 @@ condition_variable ftp_telnet_send_cv;
 	6, 7 (ip send pipe read, write)
 	8, 9 (udp receive pipe read, write)
 	10, 11 (tcp receive pipe read, write)
+	12, 13 (tcp send pipe read, write)
 	12, 13 (udp/tcp send pipe read, write)
 	14, 15 (ftp receive pipe read, write)
 	16, 17 (telnet receive pipe read, write)
+	18, 19 (telnet send pipe read, write)
 	18, 19 (telnet/ftp send pipe read, write)
 	20, 21 (rdp receive pipe read, write)
 	22, 23 (dns receive pipe read, write)
@@ -63,7 +72,7 @@ condition_variable ftp_telnet_send_cv;
 	28, 29 (application_message_telnet send pipe read, write)
 	30, 31 (application_message_rdp send pipe read, write)
 	32, 33 (application_message_dns send pipe read, write)
-	34, 35 (socket send pipe read, write)
+	34, 35 (ftp send pipe read, write)
 */
 
 struct header {
@@ -113,10 +122,15 @@ void application_to_telnet(int *pipearray) {
 	char *message = new char[BUFSIZE];
 	memcpy(message, "3", 1);
 	for(int i = 0;i < NUM_MESSAGES;i++) {
-		application_telnet_mutex.lock();
+		//application_telnet_mutex.lock();
+		sem_wait(&application_telnet_sem);
 		write(pipearray[29], message, 1);
-		application_telnet_mutex.unlock();
-		application_telnet_cv.notify_one();
+		sem_post(&application_telnet_sem);
+		//unique_lock<mutex> lk(application_telnet_mutex);
+		//application_telnet_cv.wait(lk);
+		//lk.unlock();
+		//application_telnet_mutex.unlock();
+		//application_telnet_cv.notify_one();
 		usleep(5000);// 5 milliseconds
 	}
 
@@ -126,10 +140,12 @@ void application_to_ftp(int *pipearray) {
 	char *message = new char[BUFSIZE];
 	memcpy(message, "4", 1);
 	for(int i = 0;i < NUM_MESSAGES;i++) {
-		application_ftp_mutex.lock();
+		//application_ftp_mutex.lock();
+		sem_wait(&application_ftp_sem);
 		write(pipearray[27], message, 1);
-		application_ftp_mutex.unlock();
-		application_ftp_cv.notify_one();
+		sem_post(&application_ftp_sem);
+		//application_ftp_mutex.unlock();
+		//application_ftp_cv.notify_one();
 		usleep(5000);// 5 milliseconds
 	}
 }
@@ -236,10 +252,15 @@ void telnet_send_pipe(int *pipearray) {
 	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
-		unique_lock<mutex> lk(application_telnet_mutex);
-		application_telnet_cv.wait(lk);
+		//unique_lock<mutex> lk(application_telnet_mutex);
+		//application_telnet_cv.wait(lk);
+		sem_wait(&application_telnet_sem);
+		//application_telnet_mutex.lock();
 		bytes_read = read(pipearray[28], read_buffer, BUFSIZE);
-		lk.unlock();
+		//application_telnet_mutex.unlock();
+		//application_telnet_cv.notify_one();
+		sem_post(&application_telnet_sem);
+		//lk.unlock();
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from application telnet send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -249,12 +270,18 @@ void telnet_send_pipe(int *pipearray) {
 		temp_buffer = append_header_to_message(0, 8, read_buffer, bytes_read);
 		memcpy(send_buffer, "6", 1);
 		memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read));
-		ftp_telnet_send_mutex.lock();
+		//ftp_telnet_send_mutex.lock();
+		sem_wait(&telnet_send_sem);
 		if(write(pipearray[19], send_buffer, (bytes_read + HEADER_LEN + 1)) == -1) {
-			fprintf(stderr, "error writing to ftp/telnet send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error writing to telnet send pipe: %s\n", strerror(errno));
 		}
-		ftp_telnet_send_mutex.unlock();
-		ftp_telnet_send_cv.notify_one();
+		//unique_lock<mutex> lk2(telnet_send_mutex);
+		//telnet_send_cv.wait(lk2);
+		//lk2.unlock();
+		//cout << "8" << endl;
+		sem_post(&telnet_send_sem);
+		//ftp_telnet_send_mutex.unlock();
+		//ftp_telnet_send_cv.notify_one();
 	}
 }
 
@@ -284,10 +311,12 @@ void ftp_send_pipe(int *pipearray) {
 	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
-		unique_lock<mutex> lk(application_ftp_mutex);
-		application_ftp_cv.wait(lk);
+		//unique_lock<mutex> lk(application_ftp_mutex);
+		//application_ftp_cv.wait(lk);
+		sem_wait(&application_ftp_sem);
 		bytes_read = read(pipearray[26], read_buffer, BUFSIZE);
-		lk.unlock();
+		sem_post(&application_ftp_sem);
+		//lk.unlock();
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from application ftp send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -297,12 +326,18 @@ void ftp_send_pipe(int *pipearray) {
 		temp_buffer = append_header_to_message(0, 8, read_buffer, bytes_read);
 		memcpy(send_buffer, "5", 1);
 		memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read));
-		ftp_telnet_send_mutex.lock();
-		if(write(pipearray[19], send_buffer, (bytes_read + HEADER_LEN + 1)) == -1) {
-			fprintf(stderr, "error writing to ftp/telnet send pipe: %s\n", strerror(errno));
+		//ftp_telnet_send_mutex.lock();
+		sem_wait(&ftp_send_sem);
+		if(write(pipearray[35], send_buffer, (bytes_read + HEADER_LEN + 1)) == -1) {
+			fprintf(stderr, "error writing to ftp send pipe: %s\n", strerror(errno));
 		}
-		ftp_telnet_send_mutex.unlock();
-		ftp_telnet_send_cv.notify_one();
+		//unique_lock<mutex> lk2(ftp_send_mutex);
+		//ftp_send_cv.wait(lk2);
+		//lk2.unlock();
+		//cout << "7" << endl;
+		sem_post(&ftp_send_sem);
+		//ftp_telnet_send_mutex.unlock();
+		//ftp_telnet_send_cv.notify_one();
 	}
 }
 
@@ -391,13 +426,50 @@ void tcp_send_pipe(int *pipearray) {
 	char *read_buffer_minus_id = new char[BUFSIZE];
 	char *temp_buffer;
 	char *send_buffer = new char[BUFSIZE];
+	fd_set rfds;
+	FD_ZERO(&rfds);
+	FD_SET(pipearray[18], &rfds);// telnet
+	FD_SET(pipearray[34], &rfds);// ftp
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
 		bzero(read_buffer_minus_id, BUFSIZE);
-		unique_lock<mutex> lk(ftp_telnet_send_mutex);
-		ftp_telnet_send_cv.wait(lk);
-		bytes_read = read(pipearray[18], read_buffer, BUFSIZE);
-		lk.unlock();
+		//unique_lock<mutex> lk(ftp_telnet_send_mutex);
+		//ftp_telnet_send_cv.wait(lk);
+		if(select(40, &rfds, NULL, NULL, NULL) < 0) {
+			fprintf(stderr, "select error: %s\n", strerror(errno));
+		}
+		//for(int i = 0; i < 38;i++) {
+			if(FD_ISSET(pipearray[18], &rfds)) {
+				//if(i == 18) {
+					//sem_wait(&telnet_send_sem);
+					//telnet_send_mutex.lock();
+					sem_wait(&telnet_send_sem);
+					bytes_read = read(pipearray[18], read_buffer, BUFSIZE);
+					//telnet_send_mutex.unlock();
+					//telnet_send_cv.notify_all();
+					sem_post(&telnet_send_sem);
+					//sem_post(&ftp_send_sem);
+					cout << "9" << endl;
+					//break;
+			}
+				//else if(i == 34) {
+					//sem_wait(&ftp_send_sem);
+					if(FD_ISSET(pipearray[34], &rfds)) {
+						sem_wait(&ftp_send_sem);
+					//ftp_send_mutex.lock();
+					bytes_read = read(pipearray[34], read_buffer, BUFSIZE);
+					//ftp_send_mutex.unlock();
+					//ftp_send_cv.notify_all();
+					sem_post(&ftp_send_sem);
+					//sem_post(&telnet_send_sem);
+					cout << "8" << endl;
+				}
+					//break;
+				//}
+		//	}
+		//}
+		//cout << "9" << endl;
+		//lk.unlock();
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from telnet/ftp send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -516,7 +588,7 @@ void ethernet_send_pipe(int *pipearray) {
 			exit(1);
 		}
 		//cout << "ethernet send bytes read: " << bytes_read << endl;
-		cout << "5" << endl;
+		//cout << "5" << endl;
 		send_buffer = append_header_to_message(2, 8, read_buffer, bytes_read);
 		ethernet_send_mutex.lock();
 		if(write(pipearray[3], send_buffer, (bytes_read + HEADER_LEN)) == -1) {
@@ -633,19 +705,21 @@ void socket_receive(int s, int ethernet_receive_pipe_write_end) {
 		}
 	}
 }
-/*
+
 void initialize_sems() {
-	sem_init(&dns_rdp_send_sem, 0, 1);
-	sem_init(&udp_tcp_send_sem, 0, 1);
-	sem_init(&telnet_ftp_send_sem, 0, 1);
+	sem_init(&ftp_send_sem, 0, 1);
+	sem_init(&telnet_send_sem, 0, 1);
+	sem_init(&application_telnet_sem, 0, 2);
+	sem_init(&application_ftp_sem, 0, 2);
 }
 
 void destroy_sems() {
-	sem_destroy(&dns_rdp_send_sem);
-	sem_destroy(&udp_tcp_send_sem);
-	sem_destroy(&telnet_ftp_send_sem);
+	sem_destroy(&ftp_send_sem);
+	sem_destroy(&telnet_send_sem);
+	sem_destroy(&application_telnet_sem);
+	sem_destroy(&application_ftp_sem);
 }
-*/
+
 /*
 void dispatch_threads(int *pipearray) {
 	thread ethernet_receive (ethernet_receive_pipe, pipearray);
@@ -689,6 +763,7 @@ void join_threads() {
 int main(int argc, char *argv[]) {
 	int *pipearray = create_all_protocol_pipes();
 	int job;
+	initialize_sems();
 	if(argc < 2) {
 		fprintf(stderr, "usage: ./process_per_protocol <job>");
 		exit(1);
@@ -724,9 +799,9 @@ int main(int argc, char *argv[]) {
 		//dispatch_threads(pipearray);
 		cout << "Write message? ";
 		cin >> continue_;
-		thread application_dns (application_to_dns, pipearray);
+		//thread application_dns (application_to_dns, pipearray);
 		thread application_telnet (application_to_telnet, pipearray);
-		thread application_rdp (application_to_rdp, pipearray);
+		//thread application_rdp (application_to_rdp, pipearray);
 		thread application_ftp (application_to_ftp, pipearray);
 		cout << "End program? ";
 		cin >> continue_;
@@ -749,8 +824,8 @@ int main(int argc, char *argv[]) {
 		dns_send.join();
 		dns_receive.join();
 		application_telnet.join();
-		application_dns.join();
-		application_rdp.join();
+		//application_dns.join();
+		//application_rdp.join();
 		application_ftp.join();
 		//join_threads();
 	}
