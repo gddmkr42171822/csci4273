@@ -21,8 +21,8 @@
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
 #define HEADER_LEN 40
-#define NUM_PROTOCOL_PIPES 18
-#define NUM_PROTOCOL_PIPES_FDS 36
+#define NUM_PROTOCOL_PIPES 20
+#define NUM_PROTOCOL_PIPES_FDS 40
 #define NUM_MESSAGES 5
 using namespace std;
 
@@ -60,19 +60,19 @@ condition_variable ftp_send_cv;
 	8, 9 (udp receive pipe read, write)
 	10, 11 (tcp receive pipe read, write)
 	12, 13 (tcp send pipe read, write)
-	12, 13 (udp/tcp send pipe read, write)
 	14, 15 (ftp receive pipe read, write)
 	16, 17 (telnet receive pipe read, write)
 	18, 19 (telnet send pipe read, write)
-	18, 19 (telnet/ftp send pipe read, write)
 	20, 21 (rdp receive pipe read, write)
 	22, 23 (dns receive pipe read, write)
-	24, 25 (rdp/dns send pipe read, write)
+	24, 25 (rdp send pipe read, write)
 	26, 27 (application_message_ftp send pipe read, write)
 	28, 29 (application_message_telnet send pipe read, write)
 	30, 31 (application_message_rdp send pipe read, write)
 	32, 33 (application_message_dns send pipe read, write)
 	34, 35 (ftp send pipe read, write)
+	36, 37 (dns send pipe read, write)
+	38, 39 (udp send pipe read, write)
 */
 
 struct header {
@@ -170,7 +170,7 @@ void dns_send_pipe(int *pipearray) {
 		memcpy(send_buffer, "8", 1);
 		memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read));
 		dns_rdp_send_mutex.lock();
-		if(write(pipearray[25], send_buffer, (bytes_read + HEADER_LEN + 1)) == -1) {
+		if(write(pipearray[37], send_buffer, (bytes_read + HEADER_LEN + 1)) == -1) {
 			fprintf(stderr, "error writing to rdp/dns send pipe: %s\n", strerror(errno));
 		}
 		dns_rdp_send_mutex.unlock();
@@ -366,15 +366,26 @@ void udp_send_pipe(int *pipearray) {
 	char *read_buffer_minus_id = new char[BUFSIZE];
 	char *temp_buffer;
 	char *send_buffer = new char[BUFSIZE];
+	fd_set rfds;
+	FD_ZERO(&rfds);
+	FD_SET(pipearray[24], &rfds);// rdp
+	FD_SET(pipearray[36], &rfds);// dns
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
 		bzero(read_buffer_minus_id, BUFSIZE);
-		unique_lock<mutex> lk(dns_rdp_send_mutex);
-		dns_rdp_send_cv.wait(lk);
-		bytes_read = read(pipearray[24], read_buffer, BUFSIZE);
-		lk.unlock();
+		if(select(40, &rfds, NULL, NULL, NULL) < 0) {
+			fprintf(stderr, "select error: %s\n", strerror(errno));
+		}
+		if(FD_ISSET(pipearray[24], &rfds)) {
+			sem_wait(&telnet_send_sem);
+			bytes_read = read(pipearray[24], read_buffer, BUFSIZE);
+			sem_post(&telnet_send_sem);
+		}
+		if(FD_ISSET(pipearray[36], &rfds)) {
+			bytes_read = read(pipearray[36], read_buffer, BUFSIZE);
+		}
 		if(bytes_read == -1) {
-			fprintf(stderr, "error reading from rdp/dns send pipe: %s\n", strerror(errno));
+			fprintf(stderr, "error reading from rdp/dns send pipes: %s\n", strerror(errno));
 			exit(1);
 		}
 		higher_protocol_id =  (int)atol(&read_buffer[0]);
@@ -433,43 +444,21 @@ void tcp_send_pipe(int *pipearray) {
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
 		bzero(read_buffer_minus_id, BUFSIZE);
-		//unique_lock<mutex> lk(ftp_telnet_send_mutex);
-		//ftp_telnet_send_cv.wait(lk);
 		if(select(40, &rfds, NULL, NULL, NULL) < 0) {
 			fprintf(stderr, "select error: %s\n", strerror(errno));
 		}
-		//for(int i = 0; i < 38;i++) {
-			if(FD_ISSET(pipearray[18], &rfds)) {
-				//if(i == 18) {
-					//sem_wait(&telnet_send_sem);
-					//telnet_send_mutex.lock();
-					sem_wait(&telnet_send_sem);
-					bytes_read = read(pipearray[18], read_buffer, BUFSIZE);
-					//telnet_send_mutex.unlock();
-					//telnet_send_cv.notify_all();
-					sem_post(&telnet_send_sem);
-					//sem_post(&ftp_send_sem);
-					cout << "9" << endl;
-					//break;
-			}
-				//else if(i == 34) {
-					//sem_wait(&ftp_send_sem);
-					if(FD_ISSET(pipearray[34], &rfds)) {
-						sem_wait(&ftp_send_sem);
-					//ftp_send_mutex.lock();
-					bytes_read = read(pipearray[34], read_buffer, BUFSIZE);
-					//ftp_send_mutex.unlock();
-					//ftp_send_cv.notify_all();
-					sem_post(&ftp_send_sem);
-					//sem_post(&telnet_send_sem);
-					cout << "8" << endl;
-				}
-					//break;
-				//}
-		//	}
-		//}
-		//cout << "9" << endl;
-		//lk.unlock();
+		if(FD_ISSET(pipearray[18], &rfds)) {
+			sem_wait(&telnet_send_sem);
+			bytes_read = read(pipearray[18], read_buffer, BUFSIZE);
+			sem_post(&telnet_send_sem);
+			cout << "9" << endl;
+		}
+		if(FD_ISSET(pipearray[34], &rfds)) {
+			sem_wait(&ftp_send_sem);
+			bytes_read = read(pipearray[34], read_buffer, BUFSIZE);
+			sem_post(&ftp_send_sem);
+			cout << "8" << endl;
+		}
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from telnet/ftp send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -548,13 +537,22 @@ void ip_send_pipe(int *pipearray) {
 	char *read_buffer = new char[BUFSIZE];
 	char *read_buffer_minus_id = new char[BUFSIZE];
 	char *send_buffer;
+	fd_set rfds;
+	FD_ZERO(&rfds);
+	FD_SET(pipearray[12], &rfds);// tcp
+	FD_SET(pipearray[38], &rfds);// udp
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
 		bzero(read_buffer_minus_id, BUFSIZE);
-		unique_lock<mutex> lk(udp_tcp_send_mutex);
-		udp_tcp_send_cv.wait(lk);
-		bytes_read = read(pipearray[12], read_buffer, BUFSIZE);
-		lk.unlock();
+		if(select(40, &rfds, NULL, NULL, NULL) < 0) {
+			fprintf(stderr, "select error: %s\n", strerror(errno));
+		}
+		if(FD_ISSET(pipearray[12], &rfds)) {
+			bytes_read = read(pipearray[12], read_buffer, BUFSIZE);
+		}
+		if(FD_ISSET(pipearray[38], &rfds)) {
+			bytes_read = read(pipearray[38], read_buffer, BUFSIZE);
+		}
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from udp/tcp send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -800,9 +798,9 @@ int main(int argc, char *argv[]) {
 		cout << "Write message? ";
 		cin >> continue_;
 		//thread application_dns (application_to_dns, pipearray);
-		thread application_telnet (application_to_telnet, pipearray);
-		//thread application_rdp (application_to_rdp, pipearray);
-		thread application_ftp (application_to_ftp, pipearray);
+		//thread application_telnet (application_to_telnet, pipearray);
+		thread application_rdp (application_to_rdp, pipearray);
+		//thread application_ftp (application_to_ftp, pipearray);
 		cout << "End program? ";
 		cin >> continue_;
 		socket_r.join();
@@ -823,10 +821,10 @@ int main(int argc, char *argv[]) {
 		rdp_receive.join();
 		dns_send.join();
 		dns_receive.join();
-		application_telnet.join();
+		//application_telnet.join();
 		//application_dns.join();
-		//application_rdp.join();
-		application_ftp.join();
+		application_rdp.join();
+		//application_ftp.join();
 		//join_threads();
 	}
 	else {
