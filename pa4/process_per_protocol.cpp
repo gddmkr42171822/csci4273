@@ -24,11 +24,12 @@
 #define HEADER_LEN 40
 #define NUM_PROTOCOL_PIPES 20
 #define NUM_PROTOCOL_PIPES_FDS 40
-#define NUM_MESSAGES 3
+#define NUM_MESSAGES 2
 using namespace std;
 
 
 sem_t tcp_send_sem;
+sem_t ftp_send_sem;
 sem_t telnet_send_sem;
 sem_t application_telnet_sem;
 sem_t application_ftp_sem;
@@ -128,14 +129,16 @@ void application_to_rdp(int *pipearray) {
 void application_to_telnet(int *pipearray) {
 	char *message = new char[BUFSIZE];
 	memcpy(message, "6", 1);
-	pollfd *new_poll = new pollfd;
-	new_poll->fd = pipearray[29];
-	new_poll->events = POLLIN;
+	//pollfd *new_poll = new pollfd;
+	//new_poll->fd = pipearray[29];
+	//new_poll->events = POLLIN;
 	for(int i = 0;i < NUM_MESSAGES;i++) {
-		while(poll(new_poll, 1, 0) == 1) {
+		//while(poll(new_poll, 1, 0) == 1) {
 			/* data available */
-		}
+		//}
+		sem_wait(&application_telnet_sem);
 		write(pipearray[29], message, 1);
+		sem_post(&application_telnet_sem);
 		usleep(5000);// 5 milliseconds
 	}
 
@@ -144,14 +147,16 @@ void application_to_telnet(int *pipearray) {
 void application_to_ftp(int *pipearray) {
 	char *message = new char[BUFSIZE];
 	memcpy(message, "5", 1);
-	pollfd *new_poll = new pollfd;
-	new_poll->fd = pipearray[29];
-	new_poll->events = POLLIN;
+	//pollfd *new_poll = new pollfd;
+	//new_poll->fd = pipearray[29];
+	//new_poll->events = POLLIN;
 	for(int i = 0;i < NUM_MESSAGES;i++) {
-		while(poll(new_poll, 1, 0) == 1) {
+		//while(poll(new_poll, 1, 0) == 1) {
 			/* data available */
-		}
+		//}
+		sem_wait(&application_telnet_sem);
 		write(pipearray[27], message, 1);
+		sem_post(&application_telnet_sem);
 		usleep(5000);// 5 milliseconds
 	}
 }
@@ -250,12 +255,14 @@ void telnet_send_pipe(int *pipearray) {
 	char *read_buffer = new char[BUFSIZE];
 	char *temp_buffer;
 	char *send_buffer = new char[BUFSIZE];
-	pollfd *new_poll = new pollfd;
-	new_poll->fd = pipearray[19];
-	new_poll->events = POLLIN;
+	//pollfd *new_poll = new pollfd;
+	//new_poll->fd = pipearray[19];
+	//new_poll->events = POLLIN;
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
+		sem_post(&application_telnet_sem);
 		bytes_read = read(pipearray[28], read_buffer, BUFSIZE);
+		sem_wait(&application_telnet_sem);
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from application telnet send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -264,12 +271,14 @@ void telnet_send_pipe(int *pipearray) {
 		temp_buffer = append_header_to_message(0, 8, read_buffer, bytes_read);
 		memcpy(send_buffer, "6", 1);
 		memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read));
-		while(poll(new_poll, 1, 0) == 1) {
+		//while(poll(new_poll, 1, 0) == 1) {
 			/* data available */
-		}
+		//}
+		sem_wait(&telnet_send_sem);
 		if(write(pipearray[19], send_buffer, (bytes_read + HEADER_LEN + 1)) == -1) {
 			fprintf(stderr, "error writing to telnet send pipe: %s\n", strerror(errno));
 		}
+		sem_post(&telnet_send_sem);
 		cout << read_buffer << endl;
 	}
 }
@@ -298,12 +307,14 @@ void ftp_send_pipe(int *pipearray) {
 	char *read_buffer = new char[BUFSIZE];
 	char *temp_buffer;
 	char *send_buffer = new char[BUFSIZE];
-	pollfd *new_poll = new pollfd;
-	new_poll->fd = pipearray[35];
-	new_poll->events = POLLIN;
+	//pollfd *new_poll = new pollfd;
+	//new_poll->fd = pipearray[35];
+	//new_poll->events = POLLIN;
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
+		sem_post(&application_ftp_sem);
 		bytes_read = read(pipearray[26], read_buffer, BUFSIZE);
+		sem_wait(&application_ftp_sem);
 		if(bytes_read == -1) {
 			fprintf(stderr, "error reading from application ftp send pipe: %s\n", strerror(errno));
 			exit(1);
@@ -312,12 +323,14 @@ void ftp_send_pipe(int *pipearray) {
 		temp_buffer = append_header_to_message(0, 8, read_buffer, bytes_read);
 		memcpy(send_buffer, "5", 1);
 		memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read));
-		while(poll(new_poll, 1, 0) == 1) {
+		//while(poll(new_poll, 1, 0) == 1) {
 			/* data available */
-		}
+		//}
+		sem_wait(&ftp_send_sem);
 		if(write(pipearray[35], send_buffer, (bytes_read + HEADER_LEN + 1)) == -1) {
 			fprintf(stderr, "error writing to ftp send pipe: %s\n", strerror(errno));
 		}
+		sem_post(&ftp_send_sem);
 		cout << read_buffer << endl;
 	}
 }
@@ -431,7 +444,9 @@ void tcp_send_pipe(int *pipearray) {
 		bzero(read_buffer, BUFSIZE);
 		bzero(read_buffer_minus_id, BUFSIZE);
 		if(poll(telnet_poll, 1, 0) == 1) {
+			sem_post(&telnet_send_sem);
 			bytes_read = read(pipearray[18], read_buffer, BUFSIZE);
+			sem_wait(&telnet_send_sem);
 			if(bytes_read == -1) {
 				fprintf(stderr, "error reading from telnet send pipe: %s\n", strerror(errno));
 				exit(1);
@@ -442,16 +457,20 @@ void tcp_send_pipe(int *pipearray) {
 			temp_buffer = append_header_to_message(higher_protocol_id, 4, read_buffer_minus_id, bytes_read-1);
 			memcpy(send_buffer, "3", 1);
 			memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read-1));
-			while(poll(ip_poll, 1, 0) == 1) {
+			//while(poll(ip_poll, 1, 0) == 1) {
 				/* data available */
-			}
+			//}
+			sem_wait(&tcp_send_sem);
 			if(write(pipearray[13], send_buffer, (bytes_read + HEADER_LEN )) == -1) {
 				fprintf(stderr, "error writing to udp/tcp send pipe: %s\n", strerror(errno));
 			}
+			sem_post(&tcp_send_sem);
 			cout << "1" << endl;
 		}
 		else if(poll(ftp_poll, 1, 0) == 1) {
+			sem_post(&ftp_send_sem);
 			bytes_read = read(pipearray[34], read_buffer, BUFSIZE);
+			sem_wait(&ftp_send_sem);
 			if(bytes_read == -1) {
 				fprintf(stderr, "error reading from ftp send pipe: %s\n", strerror(errno));
 				exit(1);
@@ -462,12 +481,14 @@ void tcp_send_pipe(int *pipearray) {
 			temp_buffer = append_header_to_message(higher_protocol_id, 4, read_buffer_minus_id, bytes_read-1);
 			memcpy(send_buffer, "3", 1);
 			memcpy(send_buffer + 1, temp_buffer, (HEADER_LEN + bytes_read-1));
-			while(poll(ip_poll, 1, 0) == 1) {
+			//while(poll(ip_poll, 1, 0) == 1) {
 				/* data available */
-			}
+			//}
+			sem_wait(&tcp_send_sem);
 			if(write(pipearray[13], send_buffer, (bytes_read + HEADER_LEN )) == -1) {
 				fprintf(stderr, "error writing to udp/tcp send pipe: %s\n", strerror(errno));
 			}
+			sem_post(&tcp_send_sem);
 			cout << "2" << endl;
 		}
 	}
@@ -545,7 +566,9 @@ void ip_send_pipe(int *pipearray) {
 		bzero(read_buffer, BUFSIZE);
 		bzero(read_buffer_minus_id, BUFSIZE);
 		if(poll(tcp_poll, 1, 0) == 1) {
+			sem_post(&tcp_send_sem);
 			bytes_read = read(pipearray[12], read_buffer, BUFSIZE);
+			sem_wait(&tcp_send_sem);
 			if(bytes_read == -1) {
 				fprintf(stderr, "error reading from udp/tcp send pipe: %s\n", strerror(errno));
 				exit(1);
@@ -555,13 +578,13 @@ void ip_send_pipe(int *pipearray) {
 			//cout << "ip send bytes read: " << bytes_read - 1 << endl;
 			memcpy(read_buffer_minus_id, read_buffer + 1, BUFSIZE-1);
 			send_buffer = append_header_to_message(higher_protocol_id, 12, read_buffer_minus_id, bytes_read-1);
-			while(poll(ethernet_poll, 1, 0) == 1) {
+			//while(poll(ethernet_poll, 1, 0) == 1) {
 				/* data available */
-			}
-			if(write(pipearray[7], send_buffer, (bytes_read + HEADER_LEN - 1)) == -1) {
-				fprintf(stderr, "error writing to ip send pipe: %s\n", strerror(errno));
-			}
-			//cout << "0" << endl;
+			//}
+			//if(write(pipearray[7], send_buffer, (bytes_read + HEADER_LEN - 1)) == -1) {
+				//fprintf(stderr, "error writing to ip send pipe: %s\n", strerror(errno));
+			//}
+			cout << "0" << endl;
 		}
 		else if(poll(udp_poll, 1, 0) == 1) {
 			bytes_read = read(pipearray[38], read_buffer, BUFSIZE);
@@ -725,14 +748,16 @@ void socket_receive(int s, int ethernet_receive_pipe_write_end) {
 }
 
 void initialize_sems() {
-	sem_init(&tcp_send_sem, 0, 1);
-	sem_init(&telnet_send_sem, 0, 1);
-	sem_init(&application_telnet_sem, 0, 1);
-	sem_init(&application_ftp_sem, 0, 1);
+	sem_init(&tcp_send_sem, 0, 0);
+	sem_init(&tcp_send_sem, 0, 0);
+	sem_init(&telnet_send_sem, 0, 0);
+	sem_init(&application_telnet_sem, 0, 0);
+	sem_init(&application_ftp_sem, 0, 0);
 }
 
 void destroy_sems() {
 	sem_destroy(&tcp_send_sem);
+	sem_destroy(&ftp_send_sem);
 	sem_destroy(&telnet_send_sem);
 	sem_destroy(&application_telnet_sem);
 	sem_destroy(&application_ftp_sem);
