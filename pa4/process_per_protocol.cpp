@@ -24,7 +24,7 @@
 #define HEADER_LEN 40
 #define NUM_PROTOCOL_PIPES 20
 #define NUM_PROTOCOL_PIPES_FDS 40
-#define NUM_MESSAGES 2
+#define NUM_MESSAGES 5
 using namespace std;
 
 sem_t rdp_send_sem;
@@ -157,7 +157,7 @@ void dns_send_pipe(int *pipearray) {
 			fprintf(stderr, "error writing to rdp/dns send pipe: %s\n", strerror(errno));
 		}
 		sem_post(&dns_send_sem);
-		//cout << read_buffer << endl;
+		cout << read_buffer << endl;
 	}
 }
 
@@ -592,7 +592,7 @@ void ip_send_pipe(int *pipearray) {
 			sem_post(&ip_send_sem);
 			//cout << "0" << endl;
 		}
-		else if(read_udp_messages < NUM_MESSAGES) {
+		else if(read_udp_messages < NUM_MESSAGES*2) {
 			sem_post(&udp_send_sem);
 			bytes_read = read(pipearray[38], read_buffer, BUFSIZE);
 			sem_wait(&udp_send_sem);
@@ -889,8 +889,8 @@ int main(int argc, char *argv[]) {
 		application_ftp.join();
 		thread application_rdp (application_to_rdp, pipearray);
 		application_rdp.join();
-		/*thread application_dns (application_to_dns, pipearray);
-		application_dns.join();*/
+		thread application_dns (application_to_dns, pipearray);
+		application_dns.join();
 		cout << "End program? ";
 		cin >> continue_;
 		socket_r.join();
