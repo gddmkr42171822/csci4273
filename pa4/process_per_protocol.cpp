@@ -716,9 +716,6 @@ void socket_send(int port_number, int s, int ethernet_send_pipe_read_end) {
 		servaddr.sin_family = AF_INET;
 		servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 		servaddr.sin_port = htons(port_number);
-		while(poll(socket_poll, 1, 0) == 1) {
-
-		}
 		sendto_error = sendto(s, buffer, bytes_read, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
 		if(sendto_error == -1) {
 			fprintf(stderr, "error sending udp message: %s\n", strerror(errno));
@@ -789,19 +786,9 @@ void destroy_sems() {
 	sem_destroy(&telnet_receive_sem);
 }
 
-int main(int argc, char *argv[]) {
+int main() {
 	int *pipearray = create_all_protocol_pipes();
-	int job;
 	initialize_sems();
-	if(argc < 2) {
-		fprintf(stderr, "usage: ./process_per_protocol <job>");
-		exit(1);
-	}
-	else {
-		job = (int)atol(argv[1]);
-	}
-
-	if(job == 1) {
 		int serv_in_udp_port, out_udp_socket, in_udp_socket, continue_;
 		out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
 		in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
@@ -829,16 +816,18 @@ int main(int argc, char *argv[]) {
 		cin >> continue_;
 		sleep(3);
 		thread application_telnet (application_to_telnet, pipearray);
-		application_telnet.join();
-		sleep(1);
+		//application_telnet.join();
 		thread application_ftp (application_to_ftp, pipearray);
-		application_ftp.join();
-		sleep(1);
+		//application_ftp.join();
 		thread application_rdp (application_to_rdp, pipearray);
-		application_rdp.join();
-		sleep(1);
+		//application_rdp.join();
 		thread application_dns (application_to_dns, pipearray);
+		//application_dns.join();
+
 		application_dns.join();
+		application_rdp.join();
+		application_ftp.join();
+		application_telnet.join();
 		cout << "End program? ";
 		cin >> continue_;
 		socket_r.join();
@@ -859,61 +848,5 @@ int main(int argc, char *argv[]) {
 		ftp_receive.join();
 		rdp_receive.join();
 		dns_receive.join();
-	}
-	else {
-		int serv_in_udp_port, out_udp_socket, in_udp_socket, continue_;
-		out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
-		in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
-		cout << "Enter the port number of the server in udp socket: ";
-		cin >> serv_in_udp_port;
-		thread socket_r (socket_receive, in_udp_socket, pipearray[1]);
-		thread socket_s (socket_send, serv_in_udp_port, out_udp_socket, pipearray[2]);
-		thread ethernet_receive (ethernet_receive_pipe, pipearray);
-		thread ethernet_send (ethernet_send_pipe, pipearray);
-		thread ip_send (ip_send_pipe, pipearray);
-		thread ip_receive (ip_receive_pipe, pipearray);
-		thread tcp_send (tcp_send_pipe, pipearray);
-		thread tcp_receive (tcp_receive_pipe, pipearray);
-		thread dns_send (dns_send_pipe, pipearray);
-		thread udp_send (udp_send_pipe, pipearray);
-		thread udp_receive (udp_receive_pipe, pipearray);
-		thread ftp_send (ftp_send_pipe, pipearray);
-		thread ftp_receive (ftp_receive_pipe, pipearray);
-		thread telnet_send (telnet_send_pipe, pipearray);
-		thread telnet_receive (telnet_receive_pipe, pipearray);
-		thread rdp_send (rdp_send_pipe, pipearray);
-		thread rdp_receive (rdp_receive_pipe, pipearray);
-		thread dns_receive (dns_receive_pipe, pipearray);
-		cout << "Write message? ";
-		cin >> continue_;
-		thread application_telnet (application_to_telnet, pipearray);
-		application_telnet.join();
-		thread application_ftp (application_to_ftp, pipearray);
-		application_ftp.join();
-		thread application_rdp (application_to_rdp, pipearray);
-		application_rdp.join();
-		thread application_dns (application_to_dns, pipearray);
-		application_dns.join();
-		cout << "End program? ";
-		cin >> continue_;
-		socket_r.join();
-		socket_s.join();
-		ethernet_receive.join();
-		ethernet_send.join();
-		ip_send.join();
-		ip_receive.join();
-		tcp_send.join();
-		tcp_receive.join();
-		udp_send.join();
-		udp_receive.join();
-		ftp_send.join();
-		telnet_send.join();
-		rdp_send.join();
-		dns_send.join();
-		ftp_receive.join();
-		rdp_receive.join();
-		dns_receive.join();
-		telnet_receive.join();
-	}
-	return 0;
+		return 0;
 }
