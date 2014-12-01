@@ -24,7 +24,7 @@
 #define HEADER_LEN 40
 #define NUM_PROTOCOL_PIPES 20
 #define NUM_PROTOCOL_PIPES_FDS 40
-#define NUM_MESSAGES 10 
+#define NUM_MESSAGES 100 
 using namespace std;
 
 sem_t rdp_send_sem;
@@ -822,22 +822,26 @@ int main() {
 		cin >> continue_;
 		sleep(3);
 		thread application_telnet (application_to_telnet, pipearray);
-		//application_telnet.join();
-		thread application_ftp (application_to_ftp, pipearray);
-		//application_ftp.join();
-		thread application_rdp (application_to_rdp, pipearray);
-		//application_rdp.join();
-		thread application_dns (application_to_dns, pipearray);
-		//application_dns.join();
-
 		application_telnet.join();
+		telnet_receive.join();
+		thread application_ftp (application_to_ftp, pipearray);
+		application_ftp.join();
+		ftp_receive.join();
+		thread application_rdp (application_to_rdp, pipearray);
+		application_rdp.join();
+		rdp_receive.join();
+		thread application_dns (application_to_dns, pipearray);
+		application_dns.join();
+		dns_receive.join();
+		cout << "End" << endl;
+		/*application_telnet.join();
 		application_ftp.join();
 		application_rdp.join();
 		application_dns.join();
 		telnet_receive.join();
 		ftp_receive.join();
 		rdp_receive.join();
-		dns_receive.join();
+		dns_receive.join();*/
 		cout << "End program? ";
 		cin >> continue_;
 		socket_r.join();
@@ -854,5 +858,6 @@ int main() {
 		telnet_send.join();
 		rdp_send.join();
 		dns_send.join();
+		destroy_sems();
 		return 0;
 }
