@@ -28,27 +28,6 @@
 #define NUM_MESSAGES 100 
 using namespace std;
 
-sem_t rdp_send_sem;
-sem_t dns_send_sem;
-sem_t udp_send_sem;
-sem_t ethernet_send_sem;
-sem_t ip_send_sem;
-sem_t tcp_send_sem;
-sem_t ftp_send_sem;
-sem_t telnet_send_sem;
-sem_t application_telnet_sem;
-sem_t application_ftp_sem;
-sem_t application_dns_sem;
-sem_t application_rdp_sem;
-sem_t rdp_receive_sem;
-sem_t dns_receive_sem;
-sem_t udp_receive_sem;
-sem_t ethernet_receive_sem;
-sem_t ip_receive_sem;
-sem_t tcp_receive_sem;
-sem_t ftp_receive_sem;
-sem_t telnet_receive_sem;
-
 /* Pipearray designations:
 	0, 1 (ethernet recieve pipe read,write)
 	2, 3 (ethernet send pipe read, write)
@@ -147,7 +126,6 @@ void dns_send_pipe(int *pipearray) {
 		if(write(pipearray[37], send_buffer, BUFSIZE) == -1) {
 			fprintf(stderr, "error writing to rdp/dns send pipe: %s\n", strerror(errno));
 		}
-		//cout << read_buffer << endl;
 	}
 }
 
@@ -196,7 +174,6 @@ void rdp_send_pipe(int *pipearray) {
 		if(write(pipearray[25], send_buffer, BUFSIZE) == -1) {
 			fprintf(stderr, "error writing to rdp/dns send pipe: %s\n", strerror(errno));
 		}
-		//cout << read_buffer << endl;
 	}
 }
 
@@ -245,7 +222,6 @@ void telnet_send_pipe(int *pipearray) {
 		if(write(pipearray[19], send_buffer, BUFSIZE) == -1) {
 			fprintf(stderr, "error writing to telnet send pipe: %s\n", strerror(errno));
 		}
-		//cout << read_buffer << endl;
 	}
 }
 
@@ -294,7 +270,6 @@ void ftp_send_pipe(int *pipearray) {
 		if(write(pipearray[35], send_buffer, BUFSIZE) == -1) {
 			fprintf(stderr, "error writing to ftp send pipe: %s\n", strerror(errno));
 		}
-		//cout << read_buffer << endl;
 	}
 }
 
@@ -607,7 +582,7 @@ int create_udp_socket(int socket_type) {
 	if((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
 		fprintf(stderr, "cannot creat UDP socket: %s\n", strerror(errno));
 	}
-	if(::bind(s, (struct sockaddr *)&clientaddr, sizeof(clientaddr)) < 0) {
+	if(bind(s, (struct sockaddr *)&clientaddr, sizeof(clientaddr)) < 0) {
 		fprintf(stderr, "can't  to port: %s\n", strerror(errno));
 		exit(1);
 	}
@@ -673,55 +648,8 @@ void socket_receive(int s, int ethernet_receive_pipe_write_end) {
 	}
 }
 
-void initialize_sems() {
-	sem_init(&dns_send_sem, 0, 0);
-	sem_init(&rdp_send_sem, 0, 0);
-	sem_init(&udp_send_sem, 0, 0);
-	sem_init(&ethernet_send_sem, 0, 0);
-	sem_init(&tcp_send_sem, 0, 0);
-	sem_init(&ip_send_sem, 0, 0);
-	sem_init(&telnet_send_sem, 0, 0);
-	sem_init(&ftp_send_sem, 0, 0);
-	sem_init(&application_telnet_sem, 0, 0);
-	sem_init(&application_ftp_sem, 0, 0);
-	sem_init(&application_dns_sem, 0, 0);
-	sem_init(&application_rdp_sem, 0, 0);
-	sem_init(&dns_receive_sem, 0, 0);
-	sem_init(&rdp_receive_sem, 0, 0);
-	sem_init(&udp_receive_sem, 0, 0);
-	sem_init(&ethernet_receive_sem, 0, 0);
-	sem_init(&tcp_receive_sem, 0, 0);
-	sem_init(&ip_receive_sem, 0, 0);
-	sem_init(&telnet_receive_sem, 0, 0);
-	sem_init(&ftp_receive_sem, 0, 0);
-}
-
-void destroy_sems() {
-	sem_destroy(&udp_send_sem);
-	sem_destroy(&dns_send_sem);
-	sem_destroy(&rdp_send_sem);
-	sem_destroy(&ethernet_send_sem);
-	sem_destroy(&ip_send_sem);
-	sem_destroy(&tcp_send_sem);
-	sem_destroy(&ftp_send_sem);
-	sem_destroy(&telnet_send_sem);
-	sem_destroy(&application_telnet_sem);
-	sem_destroy(&application_ftp_sem);
-	sem_destroy(&application_dns_sem);
-	sem_destroy(&application_rdp_sem);
-	sem_destroy(&udp_receive_sem);
-	sem_destroy(&dns_receive_sem);
-	sem_destroy(&rdp_receive_sem);
-	sem_destroy(&ethernet_receive_sem);
-	sem_destroy(&ip_receive_sem);
-	sem_destroy(&tcp_receive_sem);
-	sem_destroy(&ftp_receive_sem);
-	sem_destroy(&telnet_receive_sem);
-}
-
 int main() {
 	int *pipearray = create_all_protocol_pipes();
-	initialize_sems();
 	int serv_in_udp_port, out_udp_socket, in_udp_socket, continue_;
 	out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
 	in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
@@ -752,16 +680,12 @@ int main() {
 	gettimeofday(&begin, NULL);
 	thread application_telnet (application_to_telnet, pipearray);
 	application_telnet.join();
-//	telnet_receive.join();
 	thread application_ftp (application_to_ftp, pipearray);
 	application_ftp.join();
-//	ftp_receive.join();
 	thread application_rdp (application_to_rdp, pipearray);
 	application_rdp.join();
-	//rdp_receive.join();
 	thread application_dns (application_to_dns, pipearray);
 	application_dns.join();
-	//dns_receive.join();
 	telnet_receive.join();
 	ftp_receive.join();
 	rdp_receive.join();
@@ -785,6 +709,5 @@ int main() {
 	telnet_send.join();
 	rdp_send.join();
 	dns_send.join();
-	destroy_sems();
 	return 0;
 }
