@@ -13,10 +13,6 @@
 #include <thread>
 #include "threadpool.h"
 #include "message.h"
-#include <semaphore.h>
-#include <mutex>
-#include <condition_variable>
-#include <poll.h>
 
 #define BUFSIZE 4096
 #define DEFAULT_NUM_THREADS 30
