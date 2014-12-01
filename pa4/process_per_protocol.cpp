@@ -142,6 +142,7 @@ void dns_send_pipe(int *pipearray) {
 	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(read_buffer, BUFSIZE);
+		bzero(send_buffer, BUFSIZE);
 		sem_post(&application_dns_sem);
 		bytes_read = read(pipearray[32], read_buffer, BUFSIZE);
 		sem_wait(&application_dns_sem);
@@ -700,23 +701,23 @@ int create_udp_socket(int socket_type) {
 void socket_send(int port_number, int s, int ethernet_send_pipe_read_end) {
 	int bytes_read;
 	char buffer[BUFSIZE];
-	pollfd *socket_poll = new pollfd;
-	socket_poll->fd = s;
-	socket_poll->events = POLLIN;
+	char *send_buffer = new char[BUFSIZE];
 	while(1) {
 		bzero(buffer, BUFSIZE);
+		bzero(send_buffer, BUFSIZE);
 		sem_post(&ethernet_send_sem);
 		if((bytes_read = read(ethernet_send_pipe_read_end, buffer, BUFSIZE)) == -1) {
 			fprintf(stderr, "error reading from send_pipe pipe: %s\n", strerror(errno));
 		}
 		sem_wait(&ethernet_send_sem);
+		send_buffer = append_header_to_message(1, 0, buffer, bytes_read);
 		int sendto_error;
 		struct sockaddr_in servaddr;
 		bzero(&servaddr, sizeof(servaddr));
 		servaddr.sin_family = AF_INET;
 		servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 		servaddr.sin_port = htons(port_number);
-		sendto_error = sendto(s, buffer, bytes_read, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
+		sendto_error = sendto(s, send_buffer, bytes_read + HEADER_LEN, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
 		if(sendto_error == -1) {
 			fprintf(stderr, "error sending udp message: %s\n", strerror(errno));
 		}
@@ -725,15 +726,20 @@ void socket_send(int port_number, int s, int ethernet_send_pipe_read_end) {
 
 void socket_receive(int s, int ethernet_receive_pipe_write_end) {
 	char *buf = new char[BUFSIZE];
+	char *write_buffer = new char [BUFSIZE];
 	int recvfrom_error;
 	while(1) {
 		bzero(buf, BUFSIZE);
+		bzero(write_buffer, BUFSIZE);
 		recvfrom_error = recvfrom(s, buf, BUFSIZE, 0, NULL, NULL);
 		if(recvfrom_error == -1) {
 			fprintf(stderr, "error receiving udp message: %s\n", strerror(errno));
 		}
+		Message *m = new Message(buf, recvfrom_error);
+		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
+		m->msgFlat(write_buffer);
 		sem_wait(&ethernet_receive_sem);
-		if(write(ethernet_receive_pipe_write_end, buf, recvfrom_error) == -1) {
+		if(write(ethernet_receive_pipe_write_end, write_buffer, temp_header->message_len) == -1) {
 			fprintf(stderr, "error writing to ethernet receive pipe: %s\n", strerror(errno));
 		}
 		sem_post(&ethernet_receive_sem);
@@ -824,10 +830,14 @@ int main() {
 		thread application_dns (application_to_dns, pipearray);
 		//application_dns.join();
 
-		application_dns.join();
-		application_rdp.join();
-		application_ftp.join();
 		application_telnet.join();
+		application_ftp.join();
+		application_rdp.join();
+		application_dns.join();
+		telnet_receive.join();
+		ftp_receive.join();
+		rdp_receive.join();
+		dns_receive.join();
 		cout << "End program? ";
 		cin >> continue_;
 		socket_r.join();
@@ -844,9 +854,5 @@ int main() {
 		telnet_send.join();
 		rdp_send.join();
 		dns_send.join();
-		telnet_receive.join();
-		ftp_receive.join();
-		rdp_receive.join();
-		dns_receive.join();
 		return 0;
 }
