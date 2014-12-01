@@ -1,5 +1,5 @@
 CC=g++
-FLAGS=-g -std=c++11 -Wall -Wextra -Wno-deprecated
+FLAGS=-g -std=c++11 -Wall -Wextra 
 LIBS=-lpthread
 RM = rm -f
 

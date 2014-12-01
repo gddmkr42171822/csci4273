@@ -20,7 +20,7 @@ Process-Per-Protocol
 - [x] Test each high-level protocol with multiple message sends
 - [ ] Define pipearray designations as macros
 - [x] Create necessary semaphores
-- [ ] Guarantee thread safety of pipes
+- [x] Guarantee thread safety of pipes
 - [ ] Refactor program with classes
 - [x] Final Test per specifications
 

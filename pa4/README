@@ -1,6 +1,4 @@
 ----Timings----
-1. Avg time for 2 process-per-protocol hosts to send and receive 400 messages = 2.86 seconds
+1. Avg time for 2 process-per-protocol hosts to send and receive 400 messages = 3.02 seconds
 
 ----Known Bugs----
-1. Process-per-protocol works occastionally.  I cannot figure out what is wrong with it.
-   I suspect either the socket send or receive or reading from 2 pipes and writing to 1. 

@@ -570,6 +570,7 @@ void ethernet_receive_pipe(int *pipearray) {
 		}
 		Message *m = new Message(buffer, BUFSIZE);
 		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
+		(void) temp_header;
 		m->msgFlat(write_buffer);
 		if(write(pipearray[5], write_buffer, BUFSIZE) == -1) {
 			fprintf(stderr, "error writing to ip receive pipe: %s\n", strerror(errno));
@@ -663,6 +664,7 @@ void socket_receive(int s, int ethernet_receive_pipe_write_end) {
 		}
 		Message *m = new Message(buf, recvfrom_error);
 		header *temp_header = (header *)m->msgStripHdr(HEADER_LEN);
+		(void) temp_header;
 		m->msgFlat(write_buffer);
 		if(write(ethernet_receive_pipe_write_end, write_buffer, BUFSIZE) == -1) {
 			fprintf(stderr, "error writing to ethernet receive pipe: %s\n", strerror(errno));
