@@ -17,12 +17,13 @@ Process-Per-Protocol
 - [x] Test ftp message
 - [x] Find header lengths for all protocols
 - [x] Implement technique to create 2 threads per protocol
-- [ ] Test each high-level protocol with multiple message sends
+- [x] Test each high-level protocol with multiple message sends
 - [ ] Define pipearray designations as macros
-- [ ] Create necessary semaphores
+- [x] Create necessary semaphores
 - [ ] Guarantee thread safety of pipes
 - [ ] Refactor program with classes
-- [ ] Final Test per specifications
+- [x] Final Test per specifications
 
 Process-Per-Message
 --------------------------
+- [ ] Make a better design than Process-Per-Protocol
