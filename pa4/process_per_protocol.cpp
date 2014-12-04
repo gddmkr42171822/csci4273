@@ -11,7 +11,6 @@
 #include <iostream>
 #include <vector>
 #include <thread>
-#include "threadpool.h"
 #include "message.h"
 
 #define BUFSIZE 4096
