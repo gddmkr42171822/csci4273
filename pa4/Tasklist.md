@@ -27,3 +27,16 @@ Process-Per-Protocol
 Process-Per-Message
 --------------------------
 - [ ] Make a better design than Process-Per-Protocol
+- [ ] Implement ethernet protocol send and receive 
+- [ ] Implement socket protocol send and receive 
+- [ ] Implement ip protocol send and receive 
+- [ ] Implement tCP protocol send and receive 
+- [ ] Implement telnet protocol send and receive 
+- [ ] Implement udp protocol send and receive 
+- [ ] Implement ftp protocol send and receive 
+- [ ] Implement dns protocol send and receive 
+- [ ] Implement rdp protocol send and receive 
+- [ ] Create function pointers 
+- [ ] Create threads
+- [ ] Add testing
+
