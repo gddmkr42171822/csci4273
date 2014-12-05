@@ -285,7 +285,13 @@ int main() {
 	cout << "Write message?";
 	cin >> continue_;
 	thread ftp (application_ftp);
+	thread rdp (application_rdp);
+	thread dns (application_dns);
+	thread telnet(application_telnet);
 	socket_r.join();
 	ftp.join();
+	rdp.join();
+	dns.join();
+	telnet.join();
 	return 0;
 }
