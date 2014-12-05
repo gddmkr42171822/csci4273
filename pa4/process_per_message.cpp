@@ -18,7 +18,7 @@
 #define HEADER_LEN 40
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
-#define NUM_MESSAGES 10
+#define NUM_MESSAGES 100
 using namespace std;
 
 struct header {
