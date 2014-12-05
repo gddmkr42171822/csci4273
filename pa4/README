@@ -1,4 +1,7 @@
 ----Timings----
 1. Avg time for 2 process-per-protocol hosts to send and receive 400 messages = 3.02 seconds
+2. Avg time for 2 process-per-message hosts to send and receive 400 messages = 1.27 seconds
+3. Avg time for 1 process-per-message and 1 process-per-protocol to send and receive
+   400 messages = 2.14 seconds
 
 ----Known Bugs----

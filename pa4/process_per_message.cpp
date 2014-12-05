@@ -314,6 +314,9 @@ int main() {
 	cin >> serv_in_udp_port;
 	cout << "Write message?";
 	cin >> continue_;
+	sleep(3);
+	struct timeval begin, end;
+	gettimeofday(&begin, NULL);
 	thread ftp (application_ftp);
 	thread rdp (application_rdp);
 	thread dns (application_dns);
@@ -323,6 +326,13 @@ int main() {
 	dns.join();
 	telnet.join();
 	cout << "All messages written!" << endl;
+	while((num_telnet_messages != NUM_MESSAGES) && (num_rdp_messages != NUM_MESSAGES) \
+	&& (num_dns_messages != NUM_MESSAGES) && (num_ftp_messages != NUM_MESSAGES)) {
+
+	}
+	gettimeofday(&end, NULL);
+	double elapsed = (end.tv_sec - begin.tv_sec) + ((end.tv_usec - begin.tv_usec)/1000000.0);
+	cout << "elapsed time: " << elapsed << "seconds" << endl;
 	socket_r.join();
 	return 0;
 }
