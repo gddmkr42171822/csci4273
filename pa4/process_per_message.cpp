@@ -18,7 +18,7 @@
 #define HEADER_LEN 40
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
-#define NUM_MESSAGES 2 
+#define NUM_MESSAGES 10
 using namespace std;
 
 struct header {
@@ -41,61 +41,63 @@ Message *append_header_to_message(int higher_protocol_id, int other_info, Messag
 }
 
 void telnet_receive(Message *msg) {
-	char *message = new char[BUFSIZE];
+	char message[BUFSIZE];
 	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
 	(void) message_header;
 	msg->msgFlat(message);
 	message[msg->msgLen()] = '\n';
-	cout << message << endl;
+	//cout << message << endl;
 	num_telnet_messages++;
 	if(num_telnet_messages == NUM_MESSAGES) {
 		cout << "telnet messages received: " << num_telnet_messages << endl;
 	}
+	delete msg;
 }
 
 void ftp_receive(Message *msg) {
-	char *message = new char[BUFSIZE];
+	char message[BUFSIZE];
 	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	cout << message_header->hlp << endl;
 	(void) message_header;
 	msg->msgFlat(message);
 	message[msg->msgLen()] = '\n';
-	cout << message << endl;
+	//cout << message << endl;
 	num_ftp_messages++;
 	if(num_ftp_messages == NUM_MESSAGES) {
 		cout << "ftp messages received: " << num_ftp_messages << endl;
 	}
+	delete msg;
 }
 
 void rdp_receive(Message *msg) {
-	char *message = new char[BUFSIZE];
+	char message[BUFSIZE];
 	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
 	(void) message_header;
 	msg->msgFlat(message);
 	message[msg->msgLen()] = '\n';
-	cout << message << endl;
+	//cout << message << endl;
 	num_rdp_messages++;
 	if(num_rdp_messages == NUM_MESSAGES) {
 		cout << "rdp messages received: " << num_rdp_messages << endl;
 	}
+	delete msg;
 }
 
 void dns_receive(Message *msg) {
-	char *message = new char[BUFSIZE];
+	char message[BUFSIZE];
 	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
 	(void) message_header;
 	msg->msgFlat(message);
 	message[msg->msgLen()] = '\n';
-	cout << message << endl;
+	//cout << message << endl;
 	num_dns_messages++;
 	if(num_dns_messages == NUM_MESSAGES) {
 		cout << "dns messages received: " << num_dns_messages << endl;
 	}
+	delete msg;
 }
 
 void tcp_receive(Message *msg) {
 	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	cout << message_header->hlp << endl;
 	if(message_header->hlp == 5) {
 		return ftp_receive(msg);
 	}
@@ -122,7 +124,6 @@ void udp_receive(Message *msg) {
 
 void ip_receive(Message *msg) {
 	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	cout << message_header->hlp << endl;
 	if(message_header->hlp == 3) {
 		return tcp_receive(msg);
 	}
@@ -141,7 +142,6 @@ void ethernet_receive(void *msg) {
 	//message[temp_msg->msgLen()] = '\n';
 	//cout << message << endl;
 	header *message_header = (header *)temp_msg->msgStripHdr(HEADER_LEN);
-	cout << message_header->hlp << endl;
 	if(message_header->hlp == 2) {
 		return ip_receive(temp_msg);
 	}
@@ -209,38 +209,43 @@ void dns_send(int prot_id, Message *msg) {
 }
 
 void application_ftp() {
-	char *message = new char[BUFSIZE];
-	memcpy(message, "5", 1);
-	Message *msg = new Message(message, 1);
 	for(int i = 0; i < NUM_MESSAGES; i++) {
+		char *message = new char[BUFSIZE];
+		memcpy(message, "5", 1);
+		Message *msg = new Message(message, 1);
 		ftp_send(0, msg);
+		usleep(5000);
 	}
 }
 
 void application_telnet() {
-	char *message = new char[BUFSIZE];
-	memcpy(message, "6", 1);
-	Message *msg = new Message(message, 1);
 	for(int i = 0; i < NUM_MESSAGES; i++) {
+		char *message = new char[BUFSIZE];
+		memcpy(message, "6", 1);
+		Message *msg = new Message(message, 1);
 		telnet_send(0, msg);
+		usleep(5000);
 	}
 }
 
 void application_rdp() {
-	char *message = new char[BUFSIZE];
-	memcpy(message, "7", 1);
-	Message *msg = new Message(message, 1);
 	for(int i = 0; i < NUM_MESSAGES; i++) {
+		char *message = new char[BUFSIZE];
+		memcpy(message, "7", 1);
+		Message *msg = new Message(message, 1);
 		rdp_send(0, msg);
+		usleep(5000);
 	}
 }
 
 void application_dns() {
-	char *message = new char[BUFSIZE];
-	memcpy(message, "8", 1);
-	Message *msg = new Message(message, 1);
+	
 	for(int i = 0; i < NUM_MESSAGES; i++) {
+		char *message = new char[BUFSIZE];
+		memcpy(message, "8", 1);
+		Message *msg = new Message(message, 1);
 		dns_send(0, msg);
+		usleep(500);
 	}
 }
 
@@ -275,17 +280,16 @@ int create_udp_socket(int socket_type) {
 }
 
 void socket_receive(ThreadPool *th) {
-	char *read_buffer = new char[BUFSIZE];
 	int recvfrom_error;
 	while(1) {
+		char *read_buffer = new char[BUFSIZE];
 		bzero(read_buffer, BUFSIZE);
 		recvfrom_error = recvfrom(in_udp_socket, read_buffer, BUFSIZE, 0, NULL, NULL);
 		if(recvfrom_error == -1) {
 			fprintf(stderr, "error receiving udp message: %s\n", strerror(errno));
 		}
-		Message *m = new Message(read_buffer, recvfrom_error);
+		Message *m = new Message(read_buffer, BUFSIZE);
 		header *message_header = (header *)m->msgStripHdr(HEADER_LEN);
-		cout << message_header->hlp << endl;
 		if(message_header->hlp == 1) {
 			th->dispatch_thread(ethernet_receive, (void*)m);
 		}
@@ -311,13 +315,13 @@ int main() {
 	cout << "Write message?";
 	cin >> continue_;
 	thread ftp (application_ftp);
-	/*thread rdp (application_rdp);
+	thread rdp (application_rdp);
 	thread dns (application_dns);
-	thread telnet(application_telnet);*/
+	thread telnet(application_telnet);
 	ftp.join();
-	//rdp.join();
-	//dns.join();
-	//telnet.join();
+	rdp.join();
+	dns.join();
+	telnet.join();
 	cout << "All messages written!" << endl;
 	socket_r.join();
 	return 0;
