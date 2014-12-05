@@ -18,6 +18,7 @@
 #define HEADER_LEN 40
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
+#define NUM_MESSAGES 1
 using namespace std;
 
 struct header {
@@ -38,8 +39,83 @@ Message *append_header_to_message(int higher_protocol_id, int other_info, Messag
 	return msg;
 }
 
+void telnet_receive(Message *msg) {
+	char *message = new char[BUFSIZE];
+	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	(void) message_header;
+	msg->msgFlat(message);
+	message[msg->msgLen()] = '\n';
+	cout << message << endl;
+}
+
+void ftp_receive(Message *msg) {
+	char *message = new char[BUFSIZE];
+	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	(void) message_header;
+	msg->msgFlat(message);
+	message[msg->msgLen()] = '\n';
+	cout << message << endl;
+}
+
+void rdp_receive(Message *msg) {
+	char *message = new char[BUFSIZE];
+	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	(void) message_header;
+	msg->msgFlat(message);
+	message[msg->msgLen()] = '\n';
+	cout << message << endl;
+}
+
+void dns_receive(Message *msg) {
+	char *message = new char[BUFSIZE];
+	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	(void) message_header;
+	msg->msgFlat(message);
+	message[msg->msgLen()] = '\n';
+	cout << message << endl;
+}
+
+void tcp_receive(Message *msg) {
+	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	if(message_header->hlp == 5) {
+		return ftp_receive(msg);
+	}
+	else if(message_header->hlp == 6) {
+		return telnet_receive(msg);
+	}
+	else {
+		fprintf(stderr, "error stripping tcp header");
+	}
+}
+
+void udp_receive(Message *msg) {
+	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	if(message_header->hlp == 7) {
+		return rdp_receive(msg);
+	}
+	else if(message_header->hlp == 8) {
+		return dns_receive(msg);
+	}
+	else {
+		fprintf(stderr, "error stripping udp header");
+	}
+}
+
+void ip_receive(Message *msg) {
+	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	if(message_header->hlp == 3) {
+		return tcp_receive(msg);
+	}
+	else if(message_header->hlp == 4) {
+		return udp_receive(msg);
+	}
+	else {
+		fprintf(stderr, "error stripping ip header");
+	}
+}
+
 void ethernet_receive(void *msg) {
-	char* message = new char[BUFSIZE];
+	//char* message = new char[BUFSIZE];
 	Message *temp_msg = (Message *) msg;
 	//temp_msg->msgFlat(message);
 	//message[temp_msg->msgLen()] = '\n';
@@ -53,115 +129,62 @@ void ethernet_receive(void *msg) {
 	}
 }
 
-void ip_receive(void *msg) {
-	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	if(message_header->hlp == 3) {
-		return tcp_receive(msg);
+void socket_send(int prot_id, Message *msg) {
+	char *send_buffer = new char[BUFSIZE];
+	Message *message; 
+	int sendto_error;
+	struct sockaddr_in servaddr;
+	bzero(&servaddr, sizeof(servaddr));
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	servaddr.sin_port = htons(serv_in_udp_port);
+	bzero(send_buffer, BUFSIZE);
+	message = append_header_to_message(prot_id, 0, msg);
+	message->msgFlat(send_buffer);
+	sendto_error = sendto(out_udp_socket, send_buffer, BUFSIZE, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
+	if(sendto_error == -1) {
+		fprintf(stderr, "error sending udp message: %s\n", strerror(errno));
 	}
-	else if(message_header->hlp == 4) {
-		return udp_receive(msg);
-	}
-	else {
-		fprintf(stderr, "error stripping ip header");
-	}
-}
-
-void tcp_receive(void *msg) {
-	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	if(message_header->hlp == 5) {
-		return ftp_receive(msg);
-	}
-	else if(message_header->hlp == 6) {
-		return telnet_receive(msg);
-	}
-	else {
-		fprintf(stderr, "error stripping tcp header");
-	}
-}
-
-void udp_receive(void *msg) {
-	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	if(message_header->hlp == 7) {
-		return rdp_receive(msg);
-	}
-	else if(message_header->hlp == 8) {
-		return dns_receive(msg);
-	}
-	else {
-		fprintf(stderr, "error stripping udp header");
-	}
-}
-
-void telnet_receive(void *msg) {
-	message[BUFSIZE];
-	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	msg->msgFlat(message);
-	message[msg->msgLen()] = '\n';
-	cout << message << endl;
-}
-
-void ftp_receive(void *msg) {
-	message[BUFSIZE];
-	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	msg->msgFlat(message);
-	message[msg->msgLen()] = '\n';
-	cout << message << endl;
-}
-
-void rdp_receive(void *msg) {
-	message[BUFSIZE];
-	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	msg->msgFlat(message);
-	message[msg->msgLen()] = '\n';
-	cout << message << endl;
-}
-
-void dns_receive(void *msg) {
-	message[BUFSIZE];
-	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
-	msg->msgFlat(message);
-	message[msg->msgLen()] = '\n';
-	cout << message << endl;
-}
-
-void ip_send(int prot_id, Message *msg) {
-	Message *message = msg->append_header_to_message(prot_id, 12, msg);
-	return ethernet_send(2, msg);
 }
 
 void ethernet_send(int prot_id, Message *msg) {
-	Message *message = msg->append_header_to_message(prot_id, 8, msg);
-	return socket_send(1, msg);
+	Message *message = append_header_to_message(prot_id, 8, msg);
+	return socket_send(1, message);
+}
+
+void ip_send(int prot_id, Message *msg) {
+	Message *message = append_header_to_message(prot_id, 12, msg);
+	return ethernet_send(2, message);
 }
 
 void tcp_send(int prot_id, Message *msg) {
-	Message *message = msg->append_header_to_message(prot_id, 4, msg);
-	return ip_send(3, msg);
+	Message *message = append_header_to_message(prot_id, 4, msg);
+	return ip_send(3, message);
 }
 
 void udp_send(int prot_id, Message *msg) {
-	Message *message = msg->append_header_to_message(prot_id, 4, msg);
-	return ip_send(4, msg);
+	Message *message = append_header_to_message(prot_id, 4, msg);
+	return ip_send(4, message);
 }
 
 void ftp_send(int prot_id, Message *msg) {
-	Message *message = msg->append_header_to_message(prot_id, 8, msg);
-	return tcp_send(5, msg);
+	Message *message = append_header_to_message(prot_id, 8, msg);
+	return tcp_send(5, message);
 }
 
 void telnet_send(int prot_id, Message *msg) {
-	Message *message = msg->append_header_to_message(prot_id, 8, msg);
-	return tcp_send(6, msg);
+	Message *message = append_header_to_message(prot_id, 8, msg);
+	return tcp_send(6, message);
 }
 
 void rdp_send(int prot_id, Message *msg) {
-	Message *message = msg->append_header_to_message(prot_id, 12, msg);
-	return udp_send(7, msg);
+	Message *message = append_header_to_message(prot_id, 12, msg);
+	return udp_send(7, message);
 }
 
 void dns_send(int prot_id, Message *msg) {
-	Message *message = msg->append_header_to_message(prot_id, 8, msg);
-	return udp_send(8, msg);
+	Message *message = append_header_to_message(prot_id, 8, msg);
+	return udp_send(8, message);
 }
 
 void application_ftp() {
@@ -230,24 +253,6 @@ int create_udp_socket(int socket_type) {
 	}
 }
 
-void socket_send(int prot_id, Message *msg) {
-	char *send_buffer = new char[BUFSIZE];
-	Message *message; 
-	int sendto_error;
-	struct sockaddr_in servaddr;
-	bzero(&servaddr, sizeof(servaddr));
-	servaddr.sin_family = AF_INET;
-	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-	servaddr.sin_port = htons(serv_in_udp_port);
-	bzero(send_buffer, BUFSIZE);
-	message = append_header_to_message(prot_id, 0, msg);
-	message->msgFlat(send_buffer);
-	sendto_error = sendto(out_udp_socket, send_buffer, BUFSIZE, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
-	if(sendto_error == -1) {
-		fprintf(stderr, "error sending udp message: %s\n", strerror(errno));
-	}
-}
-
 void socket_receive(ThreadPool *th) {
 	char *read_buffer = new char[BUFSIZE];
 	int recvfrom_error;
@@ -271,10 +276,6 @@ void socket_receive(ThreadPool *th) {
 int main() {
 	ThreadPool th(25);
 	ThreadPool *thread_pool = &th; 
-	char* message = new char[BUFSIZE];
-	bzero(message, BUFSIZE);
-	memcpy(message, "This is a test!", 15);
-	Message *msg = new Message(message, 15); 
 	int continue_;
 	out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
 	in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
@@ -283,8 +284,8 @@ int main() {
 	cin >> serv_in_udp_port;
 	cout << "Write message?";
 	cin >> continue_;
-	thread socket_s (socket_send, 1, msg);
+	thread ftp (application_ftp);
 	socket_r.join();
-	socket_s.join();
+	ftp.join();
 	return 0;
 }
