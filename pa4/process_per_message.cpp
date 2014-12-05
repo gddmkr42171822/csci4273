@@ -14,7 +14,7 @@
 #include "threadpool.h"
 #include "message.h"
 
-#define BUFSIZE 4096
+#define BUFSIZE 1024 
 #define HEADER_LEN 40
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
@@ -42,6 +42,38 @@ char *append_header_to_message(int higher_protocol_id, int other_info, char *buf
 }
 
 void ethernet_receive(void *msg) {
+	char* message = new char[BUFSIZE];
+	Message *temp_msg = (Message *) msg;
+	temp_msg->msgFlat(message);
+	message[temp_msg->msgLen()] = '\n';
+	cout << message << endl;
+}
+
+void ip_receive(void *msg) {
+	(void) msg;
+}
+
+void tcp_receive(void *msg) {
+	(void) msg;
+}
+
+void udp_receive(void *msg) {
+	(void) msg;
+}
+
+void telnet_receive(void *msg) {
+	(void) msg;
+}
+
+void ftp_receive(void *msg) {
+	(void) msg;
+}
+
+void rdp_receive(void *msg) {
+	(void) msg;
+}
+
+void dns_receive(void *msg) {
 	(void) msg;
 }
 
@@ -84,19 +116,17 @@ void socket_send(int prot_id, Message *msg) {
 	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
 	servaddr.sin_port = htons(serv_in_udp_port);
-	while(1) {
-		bzero(send_buffer, BUFSIZE);
-		bzero(message, BUFSIZE);
-		msg->msgFlat(message);
-		send_buffer = append_header_to_message(prot_id, 0, message, msg->msgLen());
-		sendto_error = sendto(out_udp_socket, send_buffer, BUFSIZE, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
-		if(sendto_error == -1) {
-			fprintf(stderr, "error sending udp message: %s\n", strerror(errno));
-		}
+	bzero(send_buffer, BUFSIZE);
+	bzero(message, BUFSIZE);
+	msg->msgFlat(message);
+	send_buffer = append_header_to_message(prot_id, 0, message, msg->msgLen());
+	sendto_error = sendto(out_udp_socket, send_buffer, BUFSIZE, 0, (struct sockaddr *)&servaddr, sizeof(servaddr));
+	if(sendto_error == -1) {
+		fprintf(stderr, "error sending udp message: %s\n", strerror(errno));
 	}
 }
 
-void socket_receive(ThreadPool th) {
+void socket_receive(ThreadPool *th) {
 	char *read_buffer = new char[BUFSIZE];
 	int recvfrom_error;
 	while(1) {
@@ -109,7 +139,7 @@ void socket_receive(ThreadPool th) {
 		header *message_header = (header *)m->msgStripHdr(HEADER_LEN);
 		(void) message_header;
 		if(message_header->hlp == 1) {
-			th.dispatch_thread(ethernet_receive, (void*)m);
+			th->dispatch_thread(ethernet_receive, (void*)m);
 		}
 		else {
 			fprintf(stderr, "error stripping socket header");
@@ -119,10 +149,21 @@ void socket_receive(ThreadPool th) {
 
 int main() {
 	ThreadPool th(25);
-	//int continue_;
+	ThreadPool *thread_pool = &th; 
+	char* message = new char[BUFSIZE];
+	bzero(message, BUFSIZE);
+	memcpy(message, "This is a test!", 15);
+	Message *msg = new Message(message, 15); 
+	int continue_;
 	out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
 	in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
+	thread socket_r (socket_receive, thread_pool);
 	cout << "Enter the port number of the server in udp socket: ";
 	cin >> serv_in_udp_port;
+	cout << "Write message?";
+	cin >> continue_;
+	thread socket_s (socket_send, 1, msg);
+	socket_r.join();
+	socket_s.join();
 	return 0;
 }
