@@ -18,7 +18,7 @@
 #define HEADER_LEN 40
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
-#define NUM_MESSAGES 1
+#define NUM_MESSAGES 2 
 using namespace std;
 
 struct header {
@@ -29,6 +29,7 @@ struct header {
 
 
 static int serv_in_udp_port, out_udp_socket, in_udp_socket;
+static int num_telnet_messages, num_rdp_messages, num_dns_messages, num_ftp_messages;
 
 Message *append_header_to_message(int higher_protocol_id, int other_info, Message *msg) {
 	header *message_header = new header;
@@ -46,15 +47,24 @@ void telnet_receive(Message *msg) {
 	msg->msgFlat(message);
 	message[msg->msgLen()] = '\n';
 	cout << message << endl;
+	num_telnet_messages++;
+	if(num_telnet_messages == NUM_MESSAGES) {
+		cout << "telnet messages received: " << num_telnet_messages << endl;
+	}
 }
 
 void ftp_receive(Message *msg) {
 	char *message = new char[BUFSIZE];
 	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	cout << message_header->hlp << endl;
 	(void) message_header;
 	msg->msgFlat(message);
 	message[msg->msgLen()] = '\n';
 	cout << message << endl;
+	num_ftp_messages++;
+	if(num_ftp_messages == NUM_MESSAGES) {
+		cout << "ftp messages received: " << num_ftp_messages << endl;
+	}
 }
 
 void rdp_receive(Message *msg) {
@@ -64,6 +74,10 @@ void rdp_receive(Message *msg) {
 	msg->msgFlat(message);
 	message[msg->msgLen()] = '\n';
 	cout << message << endl;
+	num_rdp_messages++;
+	if(num_rdp_messages == NUM_MESSAGES) {
+		cout << "rdp messages received: " << num_rdp_messages << endl;
+	}
 }
 
 void dns_receive(Message *msg) {
@@ -73,10 +87,15 @@ void dns_receive(Message *msg) {
 	msg->msgFlat(message);
 	message[msg->msgLen()] = '\n';
 	cout << message << endl;
+	num_dns_messages++;
+	if(num_dns_messages == NUM_MESSAGES) {
+		cout << "dns messages received: " << num_dns_messages << endl;
+	}
 }
 
 void tcp_receive(Message *msg) {
 	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	cout << message_header->hlp << endl;
 	if(message_header->hlp == 5) {
 		return ftp_receive(msg);
 	}
@@ -103,6 +122,7 @@ void udp_receive(Message *msg) {
 
 void ip_receive(Message *msg) {
 	header *message_header = (header *)msg->msgStripHdr(HEADER_LEN);
+	cout << message_header->hlp << endl;
 	if(message_header->hlp == 3) {
 		return tcp_receive(msg);
 	}
@@ -121,6 +141,7 @@ void ethernet_receive(void *msg) {
 	//message[temp_msg->msgLen()] = '\n';
 	//cout << message << endl;
 	header *message_header = (header *)temp_msg->msgStripHdr(HEADER_LEN);
+	cout << message_header->hlp << endl;
 	if(message_header->hlp == 2) {
 		return ip_receive(temp_msg);
 	}
@@ -264,6 +285,7 @@ void socket_receive(ThreadPool *th) {
 		}
 		Message *m = new Message(read_buffer, recvfrom_error);
 		header *message_header = (header *)m->msgStripHdr(HEADER_LEN);
+		cout << message_header->hlp << endl;
 		if(message_header->hlp == 1) {
 			th->dispatch_thread(ethernet_receive, (void*)m);
 		}
@@ -276,6 +298,10 @@ void socket_receive(ThreadPool *th) {
 int main() {
 	ThreadPool th(25);
 	ThreadPool *thread_pool = &th; 
+	num_telnet_messages = 0;
+	num_rdp_messages = 0;
+	num_dns_messages = 0;
+	num_ftp_messages = 0;
 	int continue_;
 	out_udp_socket = create_udp_socket(OUT_SOCKET_TYPE);
 	in_udp_socket = create_udp_socket(IN_SOCKET_TYPE);
@@ -285,13 +311,14 @@ int main() {
 	cout << "Write message?";
 	cin >> continue_;
 	thread ftp (application_ftp);
-	thread rdp (application_rdp);
+	/*thread rdp (application_rdp);
 	thread dns (application_dns);
-	thread telnet(application_telnet);
-	socket_r.join();
+	thread telnet(application_telnet);*/
 	ftp.join();
-	rdp.join();
-	dns.join();
-	telnet.join();
+	//rdp.join();
+	//dns.join();
+	//telnet.join();
+	cout << "All messages written!" << endl;
+	socket_r.join();
 	return 0;
 }
