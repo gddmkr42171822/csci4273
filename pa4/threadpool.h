@@ -61,10 +61,12 @@ ThreadPool::~ThreadPool(void)
 
 int ThreadPool::dispatch_thread(void dispatch_function(void*), void *arg) 
 {
+	pthread_mutex_lock(&queue_mutex);
 	dispatch_struct *thread_dispatch = new dispatch_struct;
 	thread_dispatch->arg = arg;
 	thread_dispatch->dispatch_function = dispatch_function;
 	workQueue.push(thread_dispatch);
+	pthread_mutex_unlock(&queue_mutex);
 	return 0;
 }
 

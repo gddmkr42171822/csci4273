@@ -259,7 +259,7 @@ int create_udp_socket(int socket_type) {
 	if((s = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
 		fprintf(stderr, "cannot creat UDP socket: %s\n", strerror(errno));
 	}
-	if(bind(s, (struct sockaddr *)&clientaddr, sizeof(clientaddr)) < 0) {
+	if(::bind(s, (struct sockaddr *)&clientaddr, sizeof(clientaddr)) < 0) {
 		fprintf(stderr, "can't  to port: %s\n", strerror(errno));
 		exit(1);
 	}
