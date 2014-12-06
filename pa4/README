@@ -33,5 +33,7 @@ process-per-protocol:
    400 messages = 2.14 seconds
 
 ----Known Bugs----
-NONE
+1. Unconfirmed segfaults in PPP.
 
+----Fixed Bugs----
+1. Fixed segfault in PPM from threadpool insert function.
