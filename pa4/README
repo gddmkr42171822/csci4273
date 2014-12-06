@@ -1,7 +1,37 @@
+CSCI 4273 (NETWORK SYSTEMS)
+Programming Assignment 4
+Last Updated: 05 December 2014
+**Not All This Code Is My Own**
+
+----Program Status----
+COMPLETED
+
+----Executables----
+./process-per-message - Assigns a thread to each message received and calls 
+			protocol functions on the message
+./process-per-protocol - Messages are written to pipes between protocol 
+			 functions
+
+----Header Files----
+message.h - Contains the class declaration of a message object
+threadpool.h - Contains the class declaration of a threadpool object
+
+----How To Run Program----
+To Compile Files:
+	make
+To Clear The Compilation
+	make clean
+process-per-message:
+	./process-per-message
+process-per-protocol:
+	./process-per-protocol
+	
 ----Timings----
 1. Avg time for 2 process-per-protocol hosts to send and receive 400 messages = 3.02 seconds
 2. Avg time for 2 process-per-message hosts to send and receive 400 messages = 1.27 seconds
-3. Avg time for 1 process-per-message and 1 process-per-protocol to send and receive
+3. Avg time for 1 process-per-message and 1 process-per-protocol host to send and receive
    400 messages = 2.14 seconds
 
 ----Known Bugs----
+NONE
+
