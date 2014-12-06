@@ -13,7 +13,7 @@
 #include <thread>
 #include "message.h"
 
-#define BUFSIZE 4096
+#define BUFSIZE 1024 
 #define DEFAULT_NUM_THREADS 30
 #define IN_SOCKET_TYPE 2
 #define OUT_SOCKET_TYPE 1
@@ -61,6 +61,7 @@ char *append_header_to_message(int higher_protocol_id, int other_info, char *buf
 	Message *m = new Message(buffer, bytes_read);
 	m->msgAddHdr((char*)message_header, sizeof(header));
 	m->msgFlat(send_buffer);
+	delete m;
 	return send_buffer;
 }
 
